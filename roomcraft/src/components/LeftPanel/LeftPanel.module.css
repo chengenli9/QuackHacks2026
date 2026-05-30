@@ -340,3 +340,14 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+@media (max-width: 760px) {
+  .leftPanel {
+    width: 100%;
+    min-width: 0;
+    height: 300px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+}

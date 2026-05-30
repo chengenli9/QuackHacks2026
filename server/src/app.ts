@@ -11,6 +11,7 @@ import { OpenAIObjectPropertyEstimator } from "./providers/OpenAIObjectPropertyE
 import { UnavailableAssetGenerator } from "./providers/UnavailableAssetGenerator.js";
 import { registerCommandRoutes } from "./routes/command.js";
 import { registerEstimateObjectRoutes } from "./routes/estimateObject.js";
+import { registerFallbackAssetRoutes } from "./routes/fallbackAssets.js";
 import { registerGenerateAssetRoutes } from "./routes/generateAsset.js";
 import { registerGeneratedAssetModelRoutes } from "./routes/generatedAssetModel.js";
 import { registerGeneratedAssetStatusRoutes } from "./routes/generatedAssetStatus.js";
@@ -68,6 +69,7 @@ export const createApp = async (options: AppOptions = {}) => {
     service: "quackhacks-backend"
   }));
 
+  await app.register(registerFallbackAssetRoutes);
   await app.register(registerCommandRoutes);
   await app.register(async (instance) =>
     registerEstimateObjectRoutes(instance, objectEstimator)

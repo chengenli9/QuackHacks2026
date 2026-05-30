@@ -78,3 +78,12 @@ input:focus, select:focus, textarea:focus {
   width: 100%;
   flex-shrink: 0;
 }
+
+@media (max-width: 760px) {
+  html, body, #root {
+    height: auto;
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+}

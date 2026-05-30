@@ -1,79 +1,58 @@
 import { useState } from 'react';
-import { ChevronRight, Eye, Box, Lightbulb, Camera, Globe } from 'lucide-react';
+import { Eye, EyeOff, Box, Package, Loader2, Download, Globe } from 'lucide-react';
 import useStore from '../../store/useStore';
 import styles from './RightPanel.module.css';
 
-const TREE = [
-  {
-    id: 'Scene', label: 'Scene', icon: '🌐', children: [
-      {
-        id: 'Room_Mesh', label: 'Room_Mesh', icon: '📦', children: [
-          { id: 'Floor',   label: 'Floor',   icon: '🔷' },
-          { id: 'Walls',   label: 'Walls',   icon: '🔷' },
-          { id: 'Ceiling', label: 'Ceiling', icon: '🔷' },
-        ],
-      },
-      {
-        id: 'Lights', label: 'Lights', icon: '💡', children: [
-          { id: 'Ambient', label: 'Ambient', icon: '💡' },
-          { id: 'Sun',     label: 'Sun',     icon: '💡' },
-        ],
-      },
-      { id: 'Camera', label: 'Camera', icon: '📷' },
-    ],
-  },
-];
+const TYPE_ICON_MAP = {
+  placeholder: Box,
+  glb: Package,
+  generating: Loader2,
+  imported: Download,
+};
 
-function TreeNode({ node, depth = 0, searchQuery }) {
-  const { selectedObjectId, setSelectedObject, expandedNodes, toggleNode } = useStore();
-  const isExpanded = expandedNodes.includes(node.id);
-  const isSelected = selectedObjectId === node.id;
-  const hasChildren = node.children?.length > 0;
+function ObjectRow({ obj, searchQuery }) {
+  const { selectedObjectId, setSelectedObject, setObjectVisibility } = useStore();
+  const isSelected = selectedObjectId === obj.id;
 
-  // Filter by search
-  const matchesSearch = !searchQuery || node.label.toLowerCase().includes(searchQuery.toLowerCase());
-  const childrenMatchSearch = node.children?.some(
-    (c) => !searchQuery || c.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  if (!matchesSearch && !childrenMatchSearch) return null;
+  if (searchQuery && !obj.label.toLowerCase().includes(searchQuery.toLowerCase())) {
+    return null;
+  }
+
+  const IconComp = TYPE_ICON_MAP[obj.type] || Box;
 
   return (
-    <div>
-      <div
-        className={`${styles.treeNode} ${isSelected ? styles.selected : ''}`}
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
-        onClick={() => setSelectedObject(node.id)}
-      >
-        {hasChildren ? (
-          <span
-            className={`${styles.chevron} ${isExpanded ? styles.expanded : ''}`}
-            onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }}
-          >
-            <ChevronRight size={10} />
-          </span>
-        ) : (
-          <span className={styles.chevronSpacer} />
+    <div
+      className={`${styles.treeNode} ${isSelected ? styles.selected : ''}`}
+      style={{ paddingLeft: 22 }}
+      onClick={() => setSelectedObject(obj.id)}
+    >
+      <span className={styles.chevronSpacer} />
+      <span className={styles.nodeIcon}><IconComp size={11} /></span>
+      <span className={styles.nodeName} style={{ opacity: obj.visible === false ? 0.45 : 1 }}>
+        {obj.label}
+        {obj.type === 'generating' && (
+          <span style={{ color: 'var(--accent)', marginLeft: 4, fontSize: 9 }}>generating...</span>
         )}
-        <span className={styles.nodeIcon}>{node.icon}</span>
-        <span className={styles.nodeName}>{node.label}</span>
-        <button className={styles.visibilityBtn} onClick={(e) => e.stopPropagation()}>
-          <Eye size={11} />
-        </button>
-      </div>
-
-      {hasChildren && isExpanded && (
-        <div>
-          {node.children.map((child) => (
-            <TreeNode key={child.id} node={child} depth={depth + 1} searchQuery={searchQuery} />
-          ))}
-        </div>
-      )}
+      </span>
+      <button
+        className={styles.visibilityBtn}
+        title={obj.visible === false ? 'Show' : 'Hide'}
+        onClick={(e) => {
+          e.stopPropagation();
+          setObjectVisibility(obj.id, obj.visible === false ? true : false);
+        }}
+      >
+        {obj.visible === false ? <EyeOff size={11} /> : <Eye size={11} />}
+      </button>
     </div>
   );
 }
 
 export default function HierarchyPanel() {
   const [searchQuery, setSearchQuery] = useState('');
+  const sceneObjects = useStore((s) => s.sceneObjects);
+
+  const objects = Object.values(sceneObjects);
 
   return (
     <div className={styles.hierarchyPanel}>
@@ -91,8 +70,28 @@ export default function HierarchyPanel() {
       </div>
 
       <div className={styles.hierarchyScroll}>
-        {TREE.map((node) => (
-          <TreeNode key={node.id} node={node} searchQuery={searchQuery} />
+        {/* Static scene root */}
+        <div
+          className={styles.treeNode}
+          style={{ paddingLeft: 8 }}
+        >
+          <span className={styles.nodeIcon}><Globe size={11} /></span>
+          <span className={styles.nodeName}>Scene</span>
+        </div>
+
+        {objects.length === 0 && (
+          <div style={{
+            padding: '8px 16px',
+            color: 'var(--text-muted)',
+            fontSize: 'var(--font-size-xs)',
+            fontFamily: 'var(--font-ui)',
+          }}>
+            No objects in scene
+          </div>
+        )}
+
+        {objects.map((obj) => (
+          <ObjectRow key={obj.id} obj={obj} searchQuery={searchQuery} />
         ))}
       </div>
     </div>

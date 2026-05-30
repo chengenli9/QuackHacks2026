@@ -1,3 +1,4 @@
+import './App.css';
 import useStore from './store/useStore';
 import LandingPage from './components/LandingPage/LandingPage';
 import TopBar from './components/TopBar/TopBar';
@@ -13,9 +14,9 @@ function App() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div className="appShell">
       <TopBar />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div className="editorRow">
         <LeftPanel />
         <Viewport />
         <RightPanel />

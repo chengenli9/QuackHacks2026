@@ -1,8 +1,32 @@
-import { useRef, useCallback } from 'react';
-import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { Suspense, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, GizmoHelper, GizmoViewport } from '@react-three/drei';
-import PlaceholderRoom from './PlaceholderRoom';
+import { Physics } from '@react-three/rapier';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import useStore from '../../store/useStore';
+import SceneObject from './SceneObject';
+
+function SceneExporter() {
+  const { scene } = useThree();
+  useEffect(() => {
+    const handler = () => {
+      const exporter = new GLTFExporter();
+      exporter.parseAsync(scene, { binary: true })
+        .then((result) => {
+          const blob = new Blob([result], { type: 'model/gltf-binary' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'scene.glb';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        })
+        .catch((err) => console.error('GLTFExporter error:', err));
+    };
+    window.addEventListener('roomcraft:export-glb', handler);
+    return () => window.removeEventListener('roomcraft:export-glb', handler);
+  }, [scene]);
+  return null;
+}
 
 function CameraTracker({ onUpdate }) {
   useFrame(({ camera }) => {
@@ -11,13 +35,38 @@ function CameraTracker({ onUpdate }) {
   return null;
 }
 
+function SceneObjects() {
+  const sceneObjects = useStore((s) => s.sceneObjects);
+  return (
+    <>
+      {Object.values(sceneObjects).map((obj) => (
+        <Suspense key={obj.id} fallback={null}>
+          <SceneObject obj={obj} />
+        </Suspense>
+      ))}
+    </>
+  );
+}
+
+function PhysicsWrapper({ children }) {
+  const gravityEnabled = useStore((s) => s.gravityEnabled);
+  return (
+    <Physics gravity={gravityEnabled ? [0, -9.81, 0] : [0, 0, 0]}>
+      {children}
+    </Physics>
+  );
+}
+
 export default function ThreeScene({ onCameraUpdate }) {
+  const handleMissed = () => useStore.getState().setSelectedObject(null);
+
   return (
     <Canvas
       shadows
       camera={{ position: [5, 3.2, 5], fov: 55, near: 0.1, far: 1000 }}
       gl={{ antialias: true }}
       style={{ background: '#444444' }}
+      onPointerMissed={handleMissed}
     >
       {/* Lighting */}
       <ambientLight intensity={0.3} />
@@ -43,14 +92,16 @@ export default function ThreeScene({ onCameraUpdate }) {
         cellColor="#2a2a2a"
         sectionSize={2.5}
         sectionThickness={1}
-        sectionColor="#00e5ca09"
+        sectionColor="#00e5ca"
         fadeDistance={300}
         fadeStrength={5}
         infiniteGrid
       />
 
-      {/* Scene */}
-      <PlaceholderRoom />
+      {/* Scene objects wrapped in Physics */}
+      <PhysicsWrapper>
+        <SceneObjects />
+      </PhysicsWrapper>
 
       {/* Controls */}
       <OrbitControls
@@ -70,6 +121,9 @@ export default function ThreeScene({ onCameraUpdate }) {
           hideNegativeAxes={false}
         />
       </GizmoHelper>
+
+      {/* GLB exporter — listens for roomcraft:export-glb inside Canvas context */}
+      <SceneExporter />
 
       {/* Camera tracker */}
       <CameraTracker onUpdate={onCameraUpdate} />

@@ -204,6 +204,22 @@ describe("backend API", () => {
     });
   });
 
+  it("serves deterministic fallback GLB files from returned fallback URLs", async () => {
+    app = await createApp({
+      assetGenerator: new FakeAssetGenerator(),
+      publicBaseUrl: "http://localhost:8787"
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/assets/fallback/duck.glb"
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("model/gltf-binary");
+    expect(response.rawPayload.subarray(0, 4).toString("utf8")).toBe("glTF");
+  });
+
   it("estimates object physics profiles with deterministic local rules", async () => {
     app = await createApp({ assetGenerator: new FakeAssetGenerator() });
 

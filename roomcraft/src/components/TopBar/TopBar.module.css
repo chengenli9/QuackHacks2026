@@ -128,3 +128,15 @@
   pointer-events: none;
   z-index: 300;
 }
+
+@media (max-width: 760px) {
+  .topbar {
+    gap: var(--space-sm);
+    padding: 0 var(--space-sm);
+    overflow-x: hidden;
+  }
+
+  .logoText {
+    display: none;
+  }
+}
