@@ -52,6 +52,7 @@ export const generatedAssetParamsSchema = z.object({
 });
 
 const vector3Schema = z.tuple([z.number(), z.number(), z.number()]);
+const imageMimeTypeSchema = z.enum(["image/png", "image/jpeg", "image/webp"]);
 
 export const assetPlacementSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("on_floor") }),
@@ -160,7 +161,25 @@ export const estimateObjectRequestSchema = z.object({
   label: z.string().trim().min(1).optional(),
   sourcePrompt: z.string().trim().min(1).optional(),
   dimensions: vector3Schema.optional(),
-  meshMetadata: z.record(z.string(), z.unknown()).optional()
+  meshMetadata: z.record(z.string(), z.unknown()).optional(),
+  imageBase64: z.string().trim().min(1).max(20_000_000).optional(),
+  imageMimeType: imageMimeTypeSchema.optional()
+}).superRefine((value, context) => {
+  if (value.imageBase64 && !value.imageMimeType) {
+    context.addIssue({
+      code: "custom",
+      path: ["imageMimeType"],
+      message: "imageMimeType is required when imageBase64 is provided"
+    });
+  }
+
+  if (value.imageMimeType && !value.imageBase64) {
+    context.addIssue({
+      code: "custom",
+      path: ["imageBase64"],
+      message: "imageBase64 is required when imageMimeType is provided"
+    });
+  }
 });
 
 export const objectPhysicsProfileSchema = z.object({

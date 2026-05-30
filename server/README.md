@@ -13,6 +13,8 @@ Set `MESHY_API_KEY` in `.env` to enable live Meshy generation. Without a key, th
 
 Set `OPENAI_API_KEY` to use the OpenAI object-property estimator. Without a key, `/api/estimate-object` uses deterministic local rules.
 
+Set `GEMINI_API_KEY` to use Gemini as the primary object-property estimator. The default model is `gemini-3.1-flash-lite-preview`; set `GEMINI_MODEL` to override it.
+
 ## Scripts
 
 ```bash

@@ -8,6 +8,9 @@ export type ServerConfig = {
   openAiApiKey?: string;
   openAiModel: string;
   openAiBaseUrl: string;
+  geminiApiKey?: string;
+  geminiModel: string;
+  geminiBaseUrl: string;
   publicBaseUrl: string;
   generatedAssetStorageDir: string;
 };
@@ -20,6 +23,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
   openAiApiKey: env.OPENAI_API_KEY,
   openAiModel: env.OPENAI_MODEL ?? "gpt-4.1-mini",
   openAiBaseUrl: env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
+  geminiApiKey: env.GEMINI_API_KEY,
+  geminiModel: env.GEMINI_MODEL ?? "gemini-3.1-flash-lite-preview",
+  geminiBaseUrl: env.GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta",
   publicBaseUrl: env.SERVER_PUBLIC_URL ?? `http://localhost:${env.PORT ?? 8787}`,
   generatedAssetStorageDir: resolve(
     env.GENERATED_ASSET_STORAGE_DIR ?? "storage/generated-assets"

@@ -8,6 +8,11 @@ import type {
   GeneratedAsset,
   TextAssetGenerationInput
 } from "../src/providers/AssetGenerator.js";
+import type {
+  ObjectEstimateInput,
+  ObjectPhysicsProfile,
+  ObjectPropertyEstimator
+} from "../src/providers/ObjectPropertyEstimator.js";
 
 class FakeAssetGenerator implements AssetGenerator {
   public readonly generateFromText = vi.fn(
@@ -39,14 +44,36 @@ class FakeAssetGenerator implements AssetGenerator {
   );
 }
 
+class FakeObjectPropertyEstimator implements ObjectPropertyEstimator {
+  public readonly estimate = vi.fn(
+    async (input: ObjectEstimateInput): Promise<ObjectPhysicsProfile> => ({
+      objectId: input.objectId,
+      label: "ceramic vase",
+      category: "decor",
+      material: "glass",
+      massKg: 0.9,
+      restitution: 0.08,
+      friction: 0.48,
+      static: false,
+      breakable: true,
+      collider: "cylinder",
+      confidence: 0.84,
+      notes: "Estimated from screenshot."
+    })
+  );
+}
+
 describe("backend API", () => {
   let app: FastifyInstance | undefined;
+  const originalEnv = { ...process.env };
 
   afterEach(async () => {
     if (app) {
       await app.close();
       app = undefined;
     }
+    process.env = { ...originalEnv };
+    vi.restoreAllMocks();
   });
 
   it("parses a generated asset chat command into a validated operation", async () => {
@@ -233,5 +260,107 @@ describe("backend API", () => {
       confidence: 0.72,
       notes: "Estimated locally from object label, prompt, and dimensions."
     });
+  });
+
+  it("accepts object screenshot data for VLM-backed physics estimation", async () => {
+    const estimator = new FakeObjectPropertyEstimator();
+    app = await createApp({
+      assetGenerator: new FakeAssetGenerator(),
+      objectEstimator: estimator
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/estimate-object",
+      payload: {
+        objectId: "asset_001",
+        label: "geometry_0",
+        imageBase64: "ZmFrZS1pbWFnZQ==",
+        imageMimeType: "image/png",
+        dimensions: [0.25, 0.7, 0.25],
+        meshMetadata: { nodeName: "geometry_0" }
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(estimator.estimate).toHaveBeenCalledWith({
+      objectId: "asset_001",
+      label: "geometry_0",
+      imageBase64: "ZmFrZS1pbWFnZQ==",
+      imageMimeType: "image/png",
+      dimensions: [0.25, 0.7, 0.25],
+      meshMetadata: { nodeName: "geometry_0" }
+    });
+    expect(response.json()).toMatchObject({
+      objectId: "asset_001",
+      label: "ceramic vase",
+      collider: "cylinder",
+      confidence: 0.84
+    });
+  });
+
+  it("uses Gemini as the default estimator when GEMINI_API_KEY is configured", async () => {
+    process.env.GEMINI_API_KEY = "gemini-secret";
+    process.env.GEMINI_MODEL = "gemini-3.1-flash-lite-preview";
+    delete process.env.OPENAI_API_KEY;
+
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      objectId: "asset_001",
+                      label: "rubber ball",
+                      category: "toy",
+                      material: "rubber",
+                      massKg: 0.35,
+                      restitution: 0.85,
+                      friction: 0.45,
+                      static: false,
+                      breakable: false,
+                      collider: "ball",
+                      confidence: 0.88,
+                      notes: "The image shows a small round rubber ball."
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    app = await createApp({ assetGenerator: new FakeAssetGenerator() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/estimate-object",
+      payload: {
+        objectId: "asset_001",
+        imageBase64: "ZmFrZS1pbWFnZQ==",
+        imageMimeType: "image/png"
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      objectId: "asset_001",
+      label: "rubber ball",
+      collider: "ball",
+      confidence: 0.88
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "x-goog-api-key": "gemini-secret"
+        })
+      })
+    );
   });
 });

@@ -5,6 +5,7 @@ import { HttpError, validationErrorResponse } from "./errors.js";
 import { loadConfig } from "./config.js";
 import type { AssetGenerator } from "./providers/AssetGenerator.js";
 import type { ObjectPropertyEstimator } from "./providers/ObjectPropertyEstimator.js";
+import { GeminiObjectPropertyEstimator } from "./providers/GeminiObjectPropertyEstimator.js";
 import { LocalAssetProvider } from "./providers/LocalAssetProvider.js";
 import { MeshyProvider } from "./providers/MeshyProvider.js";
 import { OpenAIObjectPropertyEstimator } from "./providers/OpenAIObjectPropertyEstimator.js";
@@ -100,6 +101,14 @@ const createDefaultAssetGenerator = (): AssetGenerator => {
 
 const createDefaultObjectEstimator = (): ObjectPropertyEstimator => {
   const config = loadConfig();
+
+  if (config.geminiApiKey) {
+    return new GeminiObjectPropertyEstimator({
+      apiKey: config.geminiApiKey,
+      model: config.geminiModel,
+      baseUrl: config.geminiBaseUrl
+    });
+  }
 
   if (!config.openAiApiKey) {
     return new LocalObjectPropertyEstimator();
