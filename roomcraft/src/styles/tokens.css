@@ -18,8 +18,8 @@
   --text-accent:    #00e5cc;
 
   /* Typography */
-  --font-ui:        'Geist Mono', 'Courier New', monospace;
-  --font-body:      'Geist', -apple-system, sans-serif;
+  --font-ui:        'Inter', -apple-system, sans-serif;
+  --font-body:      'Inter', -apple-system, sans-serif;
   --font-size-xs:   10px;
   --font-size-sm:   11px;
   --font-size-md:   13px;

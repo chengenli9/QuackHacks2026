@@ -56,15 +56,18 @@ export default function PropertiesPanel() {
         </span>
       </div>
 
-      <div className={styles.propertiesScroll}>
-        {/* Transform */}
+      {/* Transform — scrollable */}
+      <div className={styles.transformScroll}>
         <div className={styles.propSection}>
           <div className={styles.propSectionHeader}>Transform</div>
           <XYZRow label="Location" />
           <XYZRow label="Rotation" />
           <XYZRow label="Scale" />
         </div>
+      </div>
 
+      {/* Static bottom sections */}
+      <div className={styles.staticSections}>
         {/* Material */}
         <div className={styles.propSection}>
           <div className={styles.propSectionHeader}>Material</div>

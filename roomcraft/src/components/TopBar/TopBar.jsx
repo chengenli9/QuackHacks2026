@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Play, Hexagon } from 'lucide-react';
+import { Hexagon } from 'lucide-react';
 import styles from './TopBar.module.css';
 
 const MENUS = {
@@ -41,7 +41,6 @@ function MenuDropdown({ label, items, open, onToggle }) {
 
 export default function TopBar() {
   const [openMenu, setOpenMenu] = useState(null);
-  const [showTooltip, setShowTooltip] = useState(false);
 
   return (
     <header className={styles.topbar}>
@@ -62,20 +61,7 @@ export default function TopBar() {
         ))}
       </nav>
 
-      <div style={{ position: 'relative' }}>
-        <button
-          className={styles.processBtn}
-          onClick={(e) => e.preventDefault()}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-        >
-          <Play size={12} />
-          Process Video
-        </button>
-        {showTooltip && (
-          <div className={styles.processBtnTooltip}>Backend not connected</div>
-        )}
-      </div>
+
     </header>
   );
 }
