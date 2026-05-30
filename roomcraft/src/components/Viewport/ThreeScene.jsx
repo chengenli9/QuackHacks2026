@@ -1,9 +1,10 @@
-import { Physics, RigidBody } from '@react-three/rapier';
+import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/drei';
 import { PCFShadowMap } from 'three';
 import PlaceholderRoom from './PlaceholderRoom';
 import useStore from '../../store/useStore';
+import { floorColliderForSceneObjects } from '../../lib/floorCollider';
 import { rapierBodyTypeFor, rapierColliderFor } from '../../lib/rapierMapping';
 
 function CameraTracker({ onUpdate }) {
@@ -13,13 +14,13 @@ function CameraTracker({ onUpdate }) {
   return null;
 }
 
-function GroundCollider() {
+function GroundCollider({ sceneObjects }) {
+  const floor = floorColliderForSceneObjects(sceneObjects);
+  const halfExtents = floor.args.map((value) => value / 2);
+
   return (
-    <RigidBody type="fixed" colliders="cuboid">
-      <mesh visible={false} position={[0, -0.06, 0]}>
-        <boxGeometry args={[40, 0.1, 40]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
+    <RigidBody type="fixed" colliders={false}>
+      <CuboidCollider args={halfExtents} position={floor.position} />
     </RigidBody>
   );
 }
@@ -49,7 +50,7 @@ function SceneContents() {
 
   return (
     <Physics gravity={[0, -9.81, 0]}>
-      <GroundCollider />
+      <GroundCollider sceneObjects={sceneObjects} />
       {sceneObjects.map((object) => (
         <ImportedSceneObject key={object.id} object={object} />
       ))}
