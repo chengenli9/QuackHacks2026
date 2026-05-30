@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { AlertTriangle, Box, Film, Sparkles, Upload, X } from 'lucide-react';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -48,6 +48,7 @@ export default function VideoUploadPanel() {
     uploadedVideoDuration,
     setUploadedVideo,
     importedGlbFileName,
+    glbImportRequestId,
     sceneObjects,
     glbImportStatus,
     glbImportError,
@@ -60,6 +61,7 @@ export default function VideoUploadPanel() {
     addGlbImportWarning,
     clearImportedScene,
   } = useStore();
+  const lastHandledGlbImportRequest = useRef(0);
 
   const onVideoDrop = useCallback((accepted) => {
     if (!accepted.length) return;
@@ -135,6 +137,13 @@ export default function VideoUploadPanel() {
     accept: { 'model/gltf-binary': ['.glb'], 'application/octet-stream': ['.glb'] },
     multiple: false,
   });
+
+  useEffect(() => {
+    if (glbImportRequestId > lastHandledGlbImportRequest.current) {
+      lastHandledGlbImportRequest.current = glbImportRequestId;
+      glbDropzone.open();
+    }
+  }, [glbDropzone, glbImportRequestId]);
 
   return (
     <div className={styles.videoPanel}>

@@ -1,15 +1,29 @@
 import { useState, useRef, useEffect } from 'react';
 import { Hexagon } from 'lucide-react';
+import useStore from '../../store/useStore';
 import styles from './TopBar.module.css';
 
 const MENUS = {
-  File: ['New Scene', 'Open...', 'Save', '---', 'Import .glb', 'Export Scene', '---', 'Quit'],
+  File: [
+    { label: 'New Scene' },
+    { label: 'Open...' },
+    { label: 'Save' },
+    '---',
+    { label: 'Import .glb', action: 'importGlb' },
+    { label: 'Export Scene' },
+    '---',
+    { label: 'Quit' },
+  ],
   Edit: ['Undo', 'Redo', '---', 'Select All', 'Deselect All', '---', 'Preferences'],
   View: ['Toggle Left Panel', 'Toggle Right Panel', '---', 'Fullscreen', '---', 'Reset Layout'],
   Help: ['Documentation', 'Keyboard Shortcuts', '---', 'About RoomCraft'],
 };
 
-function MenuDropdown({ label, items, open, onToggle }) {
+function itemLabel(item) {
+  return typeof item === 'string' ? item : item.label;
+}
+
+function MenuDropdown({ label, items, open, onToggle, onAction }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -30,7 +44,18 @@ function MenuDropdown({ label, items, open, onToggle }) {
             item === '---' ? (
               <div key={i} className={styles.dropdownDivider} />
             ) : (
-              <button key={item} className={styles.dropdownItem}>{item}</button>
+              <button
+                key={itemLabel(item)}
+                className={`${styles.dropdownItem} ${item.action ? styles.actionable : ''}`}
+                onClick={() => {
+                  if (item.action) {
+                    onAction(item.action);
+                    onToggle(null);
+                  }
+                }}
+              >
+                {itemLabel(item)}
+              </button>
             )
           )}
         </div>
@@ -41,6 +66,13 @@ function MenuDropdown({ label, items, open, onToggle }) {
 
 export default function TopBar() {
   const [openMenu, setOpenMenu] = useState(null);
+  const requestGlbImport = useStore((state) => state.requestGlbImport);
+
+  const handleMenuAction = (action) => {
+    if (action === 'importGlb') {
+      requestGlbImport();
+    }
+  };
 
   return (
     <header className={styles.topbar}>
@@ -57,6 +89,7 @@ export default function TopBar() {
             items={items}
             open={openMenu === label}
             onToggle={setOpenMenu}
+            onAction={handleMenuAction}
           />
         ))}
       </nav>

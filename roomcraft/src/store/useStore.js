@@ -29,12 +29,18 @@ const useStore = create((set) => ({
     })),
 
   // Imported GLB scene
+  glbImportRequestId: 0,
   importedGlbFileName: null,
   glbImportStatus: 'idle',
   glbImportError: null,
   glbImportWarnings: [],
   vlmEstimateStatus: 'idle',
   sceneObjects: [],
+  requestGlbImport: () =>
+    set((state) => ({
+      glbImportRequestId: state.glbImportRequestId + 1,
+      leftPanelTab: 'video',
+    })),
   setGlbImportStatus: (status, error = null) =>
     set({ glbImportStatus: status, glbImportError: error }),
   setVlmEstimateStatus: (status) => set({ vlmEstimateStatus: status }),
