@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 
 const useStore = create((set) => ({
+  // App navigation
+  currentView: 'landing',
+  setCurrentView: (view) => set({ currentView: view }),
+
   // Panel state
   leftPanelTab: 'video',
   chatSubTab: 'image',
