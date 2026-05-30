@@ -17,6 +17,9 @@ const TOOLS = [
 export default function Viewport() {
   const { activeTool, setActiveTool, viewMode, setViewMode } = useStore();
   const [camPos, setCamPos] = useState({ x: 5.0, y: 3.2, z: 5.0 });
+  const [cameraTarget, setCameraTarget] = useState(null);
+  const [inputVals, setInputVals] = useState({ x: '5.00', y: '3.20', z: '5.00' });
+  const editingAxes = useRef(new Set());
   const [showPerspDrop, setShowPerspDrop] = useState(false);
   const [perspective, setPerspective] = useState('Perspective');
   const frameRef = useRef(null);
@@ -26,13 +29,30 @@ export default function Viewport() {
     frameRef.current = requestAnimationFrame(() => {
 	console.log(pos.x)
       setCamPos({ x: pos.x, y: pos.y, z: pos.z });
+      setInputVals(prev => {
+        const next = { ...prev };
+        if (!editingAxes.current.has('x')) next.x = pos.x.toFixed(2);
+        if (!editingAxes.current.has('y')) next.y = pos.y.toFixed(2);
+        if (!editingAxes.current.has('z')) next.z = pos.z.toFixed(2);
+        return next;
+      });
     });
   }, []);
+
+  function commitAxis(axis) {
+    const val = parseFloat(inputVals[axis]);
+    if (!isNaN(val)) {
+      setCameraTarget({ x: axis === 'x' ? val : camPos.x, y: axis === 'y' ? val : camPos.y, z: axis === 'z' ? val : camPos.z, _t: Date.now() });
+    } else {
+      setInputVals(prev => ({ ...prev, [axis]: camPos[axis].toFixed(2) }));
+    }
+    editingAxes.current.delete(axis);
+  }
 
   return (
     <div className={styles.viewport}>
       {/* Three.js Canvas */}
-      <ThreeScene onCameraUpdate={handleCameraUpdate} />
+      <ThreeScene onCameraUpdate={handleCameraUpdate} cameraTarget={cameraTarget} />
 
       {/* Viewport Top Toolbar */}
       <div className={styles.viewportToolbar}>
@@ -103,14 +123,19 @@ export default function Viewport() {
       {/* Camera Overlay */}
       <div className={styles.cameraOverlay}>
         <span className={styles.camLabel}>CAM</span>
-        <span className={styles.camLabel}>X:</span>
-        <span className={styles.camVal}>{camPos.x.toFixed(1)}</span>
-        {'  '}
-        <span className={styles.camLabel}>Y:</span>
-        <span className={styles.camVal}>{camPos.y.toFixed(1)}</span>
-        {'  '}
-        <span className={styles.camLabel}>Z:</span>
-        <span className={styles.camVal}>{camPos.z.toFixed(1)}</span>
+        {[['x'],['y'],['z']].map(([axis]) => (
+          <span key={axis} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+            <span className={styles.camLabel}>{axis.toUpperCase()}:</span>
+            <input
+              className={styles.camInput}
+              value={inputVals[axis]}
+              onChange={e => setInputVals(prev => ({ ...prev, [axis]: e.target.value }))}
+              onFocus={() => editingAxes.current.add(axis)}
+              onBlur={() => commitAxis(axis)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
+            />
+          </span>
+        ))}
       </div>
     </div>
   );
