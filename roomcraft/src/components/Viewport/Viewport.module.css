@@ -121,3 +121,25 @@
 .camVal {
   color: var(--text-accent);
 }
+
+.camInput {
+  width: 33px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--text-accent);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  text-align: right;
+  padding: 0 2px;
+  outline: none;
+  margin-right: 6px;
+}
+
+.camInput:hover {
+  border-bottom-color: var(--border);
+}
+
+.camInput:focus {
+  border-bottom-color: var(--accent);
+}

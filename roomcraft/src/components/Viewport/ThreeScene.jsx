@@ -1,16 +1,51 @@
+import { useEffect, useRef, useState } from 'react';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { GizmoHelper, GizmoViewport, Grid, OrbitControls } from '@react-three/drei';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import {
+  GizmoHelper,
+  GizmoViewport,
+  Grid,
+  OrbitControls,
+  TransformControls,
+  useGLTF,
+} from '@react-three/drei';
 import { PCFShadowMap } from 'three';
-import PlaceholderRoom from './PlaceholderRoom';
 import useStore from '../../store/useStore';
 import { floorColliderForSceneObjects } from '../../lib/floorCollider';
 import { rapierBodyTypeFor, rapierColliderFor } from '../../lib/rapierMapping';
+
+function ChaoMan({ groupRef, onSelect }) {
+  const { scene } = useGLTF('/chaoman.glb');
+
+  return (
+    <group
+      ref={groupRef}
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect();
+      }}
+    >
+      <primitive object={scene} />
+    </group>
+  );
+}
 
 function CameraTracker({ onUpdate }) {
   useFrame(({ camera }) => {
     onUpdate(camera.position);
   });
+  return null;
+}
+
+function CameraPositioner({ target }) {
+  const { camera, controls } = useThree();
+
+  useEffect(() => {
+    if (!target) return;
+    camera.position.set(target.x, target.y, target.z);
+    controls?.update();
+  }, [camera, controls, target]);
+
   return null;
 }
 
@@ -41,13 +76,7 @@ function ImportedSceneObject({ object }) {
   );
 }
 
-function SceneContents() {
-  const sceneObjects = useStore((state) => state.sceneObjects);
-
-  if (!sceneObjects.length) {
-    return <PlaceholderRoom />;
-  }
-
+function ImportedPhysicsScene({ sceneObjects }) {
   return (
     <Physics gravity={[0, -9.81, 0]}>
       <GroundCollider sceneObjects={sceneObjects} />
@@ -58,7 +87,21 @@ function SceneContents() {
   );
 }
 
-export default function ThreeScene({ onCameraUpdate }) {
+function DefaultInteractiveScene() {
+  const meshRef = useRef();
+  const [selectedObj, setSelectedObj] = useState(null);
+
+  return (
+    <>
+      <ChaoMan groupRef={meshRef} onSelect={() => setSelectedObj(meshRef.current)} />
+      {selectedObj && <TransformControls object={selectedObj} mode="translate" />}
+    </>
+  );
+}
+
+export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
+  const sceneObjects = useStore((state) => state.sceneObjects);
+
   return (
     <Canvas
       shadows={{ type: PCFShadowMap }}
@@ -94,7 +137,11 @@ export default function ThreeScene({ onCameraUpdate }) {
         infiniteGrid
       />
 
-      <SceneContents />
+      {sceneObjects.length ? (
+        <ImportedPhysicsScene sceneObjects={sceneObjects} />
+      ) : (
+        <DefaultInteractiveScene />
+      )}
 
       <OrbitControls
         makeDefault
@@ -114,6 +161,7 @@ export default function ThreeScene({ onCameraUpdate }) {
       </GizmoHelper>
 
       <CameraTracker onUpdate={onCameraUpdate} />
+      <CameraPositioner target={cameraTarget} />
     </Canvas>
   );
 }

@@ -31,7 +31,7 @@ function XYZRow({ label, values }) {
       <div className={styles.xyzRow} style={{ flex: 1 }}>
         {['X', 'Y', 'Z'].map((axis, index) => (
           <div key={axis} style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 2 }}>
-            <span className={styles.xyzLabel}>{axis}</span>
+            <span className={styles.xyzLabel} style={{ color: axis === 'X' ? '#e8524a' : axis === 'Y' ? '#6abf69' : '#4d9de0' }}>{axis}</span>
             <input
               className={styles.xyzInput}
               value={formatFixed(values[index])}
