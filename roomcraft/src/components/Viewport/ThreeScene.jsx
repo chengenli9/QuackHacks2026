@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import PlaceholderRoom from './PlaceholderRoom';
@@ -11,7 +11,17 @@ function CameraTracker({ onUpdate }) {
   return null;
 }
 
-export default function ThreeScene({ onCameraUpdate }) {
+function CameraPositioner({ target }) {
+  const { camera, controls } = useThree();
+  useEffect(() => {
+    if (!target) return;
+    camera.position.set(target.x, target.y, target.z);
+    if (controls) controls.update();
+  }, [target]);
+  return null;
+}
+
+export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   return (
     <Canvas
       shadows
@@ -73,6 +83,7 @@ export default function ThreeScene({ onCameraUpdate }) {
 
       {/* Camera tracker */}
       <CameraTracker onUpdate={onCameraUpdate} />
+      <CameraPositioner target={cameraTarget} />
     </Canvas>
   );
 }
