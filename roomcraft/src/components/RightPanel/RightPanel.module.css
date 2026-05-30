@@ -126,8 +126,8 @@
 
 .transformScroll {
   flex-shrink: 0;
-  overflow-y: auto;
-  max-height: 120px;
+  overflow-x: auto; 
+  /* max-height: 120px; */
   padding: var(--space-sm) 0;
   border-bottom: 1px solid var(--border);
 }
