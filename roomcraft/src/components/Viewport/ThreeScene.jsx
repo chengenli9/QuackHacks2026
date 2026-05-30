@@ -1,0 +1,69 @@
+import { useRef, useCallback } from 'react';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import { OrbitControls, Grid } from '@react-three/drei';
+import PlaceholderRoom from './PlaceholderRoom';
+import useStore from '../../store/useStore';
+
+function CameraTracker({ onUpdate }) {
+  useFrame(({ camera }) => {
+    onUpdate(camera.position);
+  });
+  return null;
+}
+
+export default function ThreeScene({ onCameraUpdate }) {
+  return (
+    <Canvas
+      shadows
+      camera={{ position: [5, 3.2, 5], fov: 55, near: 0.1, far: 1000 }}
+      gl={{ antialias: true }}
+      style={{ background: '#111111' }}
+    >
+      {/* Lighting */}
+      <ambientLight intensity={0.3} />
+      <directionalLight
+        castShadow
+        position={[5, 8, 4]}
+        intensity={1.2}
+        shadow-mapSize={[2048, 2048]}
+        shadow-camera-far={50}
+        shadow-camera-left={-10}
+        shadow-camera-right={10}
+        shadow-camera-top={10}
+        shadow-camera-bottom={-10}
+      />
+      <pointLight position={[-3, 3, -3]} intensity={0.4} color="#4488ff" />
+
+      {/* Grid */}
+      <Grid
+        args={[20, 20]}
+        position={[0, 0.001, 0]}
+        cellSize={1}
+        cellThickness={0.5}
+        cellColor="#2a2a2a"
+        sectionSize={5}
+        sectionThickness={1}
+        sectionColor="#00e5cc22"
+        fadeDistance={30}
+        fadeStrength={1}
+        infiniteGrid
+      />
+
+      {/* Scene */}
+      <PlaceholderRoom />
+
+      {/* Controls */}
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.05}
+        minDistance={1}
+        maxDistance={30}
+        maxPolarAngle={Math.PI / 1.8}
+      />
+
+      {/* Camera tracker */}
+      <CameraTracker onUpdate={onCameraUpdate} />
+    </Canvas>
+  );
+}

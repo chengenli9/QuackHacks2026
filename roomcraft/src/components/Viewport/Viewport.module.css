@@ -1,0 +1,123 @@
+.viewport {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #111111;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.canvas {
+  flex: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* === Viewport Top Toolbar === */
+.viewportToolbar {
+  position: absolute;
+  top: var(--space-sm);
+  left: var(--space-sm);
+  display: flex;
+  gap: 2px;
+  z-index: 10;
+  background: rgba(17, 17, 17, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+  backdrop-filter: blur(4px);
+}
+
+.toolbarBtn {
+  padding: 4px var(--space-sm);
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbarBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.toolbarBtn.active {
+  background: var(--accent-ghost);
+  color: var(--accent);
+}
+
+.toolbarDivider {
+  width: 1px;
+  background: var(--border);
+  margin: 2px;
+}
+
+/* === Transform Toolbar (left edge) === */
+.transformToolbar {
+  position: absolute;
+  left: var(--space-sm);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 10;
+  background: rgba(17, 17, 17, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px;
+  backdrop-filter: blur(4px);
+}
+
+.transformBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+
+.transformBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.transformBtn.active {
+  background: var(--accent-ghost);
+  color: var(--accent);
+}
+
+/* === Camera Overlay === */
+.cameraOverlay {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  background: rgba(17, 17, 17, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px var(--space-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  z-index: 10;
+  backdrop-filter: blur(4px);
+  line-height: 1.8;
+}
+
+.camLabel {
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.camVal {
+  color: var(--text-accent);
+}

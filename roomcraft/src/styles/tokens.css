@@ -1,0 +1,38 @@
+:root {
+  /* Colors */
+  --bg-base:        #111111;
+  --bg-panel:       #1c1c1c;
+  --bg-panel-alt:   #242424;
+  --bg-hover:       #2e2e2e;
+  --bg-active:      #333333;
+  --border:         #333333;
+  --border-subtle:  #2a2a2a;
+
+  --accent:         #00e5cc;
+  --accent-dim:     #00b8a4;
+  --accent-ghost:   rgba(0, 229, 204, 0.1);
+
+  --text-primary:   #e8e8e8;
+  --text-secondary: #888888;
+  --text-muted:     #555555;
+  --text-accent:    #00e5cc;
+
+  /* Typography */
+  --font-ui:        'Geist Mono', 'Courier New', monospace;
+  --font-body:      'Geist', -apple-system, sans-serif;
+  --font-size-xs:   10px;
+  --font-size-sm:   11px;
+  --font-size-md:   13px;
+
+  /* Spacing */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  /* Layout */
+  --left-panel-width:  240px;
+  --right-panel-width: 260px;
+  --topbar-height:      40px;
+}

@@ -1,0 +1,287 @@
+.rightPanel {
+  width: var(--right-panel-width);
+  min-width: var(--right-panel-width);
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* === Hierarchy Panel === */
+.hierarchyPanel {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  max-height: 50%;
+}
+
+.hierarchyScroll {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.searchRow {
+  padding: var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 4px var(--space-sm);
+  border-radius: 3px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+
+/* Tree nodes */
+.treeNode {
+  display: flex;
+  align-items: center;
+  padding: 3px var(--space-sm);
+  cursor: pointer;
+  border-radius: 2px;
+  gap: 3px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  user-select: none;
+  transition: background 0.1s;
+  position: relative;
+}
+
+.treeNode:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.treeNode.selected {
+  background: var(--accent-ghost);
+  color: var(--accent);
+}
+
+.chevron {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.15s;
+}
+
+.chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.chevronSpacer {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.nodeIcon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  width: 14px;
+  text-align: center;
+}
+
+.nodeName {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visibilityBtn {
+  opacity: 0;
+  transition: opacity 0.1s;
+  padding: 1px;
+  border-radius: 2px;
+  color: var(--text-muted);
+}
+
+.treeNode:hover .visibilityBtn {
+  opacity: 1;
+}
+
+/* === Properties Panel === */
+.propertiesPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.propertiesScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-sm) 0;
+}
+
+.propSection {
+  padding: 0 var(--space-md) var(--space-sm);
+}
+
+.propSectionHeader {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: var(--space-xs) 0;
+  margin-bottom: var(--space-xs);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.xyzRow {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--space-xs);
+}
+
+.xyzLabel {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.xyzInput {
+  flex: 1;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  text-align: right;
+}
+
+.transformRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: 6px;
+}
+
+.transformLabel {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.colorLabel {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.colorSwatch {
+  width: 28px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.colorSwatch input[type="color"] {
+  width: 40px;
+  height: 28px;
+  margin-left: -6px;
+  margin-top: -5px;
+  border: none;
+  cursor: pointer;
+  background: none;
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.sliderLabel {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.slider {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 3px;
+  background: var(--bg-active);
+  border-radius: 2px;
+  outline: none;
+  border: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.sliderVal {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.meshInfoRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.meshInfoKey {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.meshInfoVal {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-primary);
+}

@@ -1,0 +1,130 @@
+.topbar {
+  height: var(--topbar-height);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-md);
+  gap: var(--space-lg);
+  flex-shrink: 0;
+  z-index: 100;
+  position: relative;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  text-decoration: none;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.logoIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.logoText {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+}
+
+.menuBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
+
+.menuItem {
+  position: relative;
+  padding: 4px var(--space-sm);
+  border-radius: 3px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  transition: background 0.1s, color 0.1s;
+}
+
+.menuItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.menuItem.active {
+  background: var(--bg-active);
+  color: var(--text-primary);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-xs) 0;
+  z-index: 200;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.dropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px var(--space-md);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.dropdownItem:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.dropdownDivider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-xs) 0;
+}
+
+.processBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 6px var(--space-md);
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.processBtnTooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 4px var(--space-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 300;
+}
