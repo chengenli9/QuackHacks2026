@@ -1,8 +1,16 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Grid, GizmoHelper, GizmoViewport } from '@react-three/drei';
-import PlaceholderRoom from './PlaceholderRoom';
+import { OrbitControls, Grid, GizmoHelper, GizmoViewport, useGLTF, TransformControls } from '@react-three/drei';
 import useStore from '../../store/useStore';
+
+function ChaoMan({ groupRef, onSelect }) {
+  const { scene } = useGLTF('/chaoman.glb');
+  return (
+    <group ref={groupRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+      <primitive object={scene} />
+    </group>
+  );
+}
 
 function CameraTracker({ onUpdate }) {
   useFrame(({ camera }) => {
@@ -11,13 +19,27 @@ function CameraTracker({ onUpdate }) {
   return null;
 }
 
-export default function ThreeScene({ onCameraUpdate }) {
+function CameraPositioner({ target }) {
+  const { camera, controls } = useThree();
+  useEffect(() => {
+    if (!target) return;
+    camera.position.set(target.x, target.y, target.z);
+    if (controls) controls.update();
+  }, [target]);
+  return null;
+}
+
+export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
+  const meshRef = useRef();
+  const [selectedObj, setSelectedObj] = useState(null);
+
   return (
     <Canvas
       shadows
       camera={{ position: [5, 3.2, 5], fov: 55, near: 0.1, far: 1000 }}
       gl={{ antialias: true }}
       style={{ background: '#444444' }}
+      onPointerMissed={() => setSelectedObj(null)}
     >
       {/* Lighting */}
       <ambientLight intensity={0.3} />
@@ -50,7 +72,10 @@ export default function ThreeScene({ onCameraUpdate }) {
       />
 
       {/* Scene */}
-      <PlaceholderRoom />
+      <ChaoMan groupRef={meshRef} onSelect={() => setSelectedObj(meshRef.current)} />
+      {selectedObj && (
+        <TransformControls object={selectedObj} mode="translate" />
+      )}
 
       {/* Controls */}
       <OrbitControls
@@ -73,6 +98,7 @@ export default function ThreeScene({ onCameraUpdate }) {
 
       {/* Camera tracker */}
       <CameraTracker onUpdate={onCameraUpdate} />
+      <CameraPositioner target={cameraTarget} />
     </Canvas>
   );
 }
