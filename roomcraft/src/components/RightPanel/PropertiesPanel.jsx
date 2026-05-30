@@ -29,7 +29,6 @@ function XYZRow({ label }) {
               defaultValue={axis === 'X' || axis === 'Y' || axis === 'Z'
                 ? label === 'Scale' ? '1.00' : '0.00'
                 : '0.00'}
-              readOnly
             />
           </div>
         ))}
