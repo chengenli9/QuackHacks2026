@@ -17,7 +17,7 @@ export default function ThreeScene({ onCameraUpdate }) {
       shadows
       camera={{ position: [5, 3.2, 5], fov: 55, near: 0.1, far: 1000 }}
       gl={{ antialias: true }}
-      style={{ background: '#111111' }}
+      style={{ background: '#444444' }}
     >
       {/* Lighting */}
       <ambientLight intensity={0.3} />
@@ -43,9 +43,9 @@ export default function ThreeScene({ onCameraUpdate }) {
         cellColor="#2a2a2a"
         sectionSize={2.5}
         sectionThickness={1}
-        sectionColor="#00e5cc22"
-        fadeDistance={30}
-        fadeStrength={1}
+        sectionColor="#00e5ca09"
+        fadeDistance={300}
+        fadeStrength={5}
         infiniteGrid
       />
 
