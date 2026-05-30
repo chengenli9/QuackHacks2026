@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { OrbitControls, Grid, GizmoHelper, GizmoViewport } from '@react-three/drei';
 import PlaceholderRoom from './PlaceholderRoom';
 import useStore from '../../store/useStore';
 
@@ -38,10 +38,10 @@ export default function ThreeScene({ onCameraUpdate }) {
       <Grid
         args={[20, 20]}
         position={[0, 0.001, 0]}
-        cellSize={1}
+        cellSize={0.5}
         cellThickness={0.5}
         cellColor="#2a2a2a"
-        sectionSize={5}
+        sectionSize={2.5}
         sectionThickness={1}
         sectionColor="#00e5cc22"
         fadeDistance={30}
@@ -61,6 +61,15 @@ export default function ThreeScene({ onCameraUpdate }) {
         maxDistance={30}
         maxPolarAngle={Math.PI / 1.8}
       />
+
+      {/* Navigation Gizmo */}
+      <GizmoHelper alignment="top-right" margin={[65, 100]}>
+        <GizmoViewport
+          axisColors={['#e8524a', '#6abf69', '#4d9de0']}
+          labelColor="#ffffff"
+          hideNegativeAxes={false}
+        />
+      </GizmoHelper>
 
       {/* Camera tracker */}
       <CameraTracker onUpdate={onCameraUpdate} />
