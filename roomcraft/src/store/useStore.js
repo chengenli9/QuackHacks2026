@@ -222,6 +222,16 @@ const useStore = create((set, get) => ({
   setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
   setChatSubTab: (tab) => set({ chatSubTab: tab }),
 
+  // Panel layout (UI chrome — not project state)
+  leftPanelMinimized: false,
+  rightPanelMinimized: false,
+  leftPanelWidth: 240,
+  rightPanelWidth: 260,
+  toggleLeftPanel: () => set((s) => ({ leftPanelMinimized: !s.leftPanelMinimized })),
+  toggleRightPanel: () => set((s) => ({ rightPanelMinimized: !s.rightPanelMinimized })),
+  setLeftPanelWidth: (w) => set({ leftPanelWidth: w }),
+  setRightPanelWidth: (w) => set({ rightPanelWidth: w }),
+
   // Viewport
   setActiveTool: (tool) => set({ activeTool: tool }),
   setViewMode: (mode) => set({ viewMode: mode }),
