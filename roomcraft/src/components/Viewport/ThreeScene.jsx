@@ -81,6 +81,11 @@ function CameraPositioner({ cameraTarget, perspective }) {
   return null;
 }
 
+function setObjectVisibility(object3d, visible) {
+  if (!object3d) return;
+  object3d.visible = visible;
+}
+
 function GroundCollider({ sceneObjects }) {
   const floor = floorColliderForSceneObjects(sceneObjects);
   const halfExtents = floor.args.map((value) => value / 2);
@@ -137,6 +142,10 @@ function ImportedSceneObject({
     if (!object.object3d) return;
     applyObjectAppearance(object.object3d, object.appearance, viewMode);
   }, [object.appearance, object.object3d, viewMode]);
+
+  useEffect(() => {
+    setObjectVisibility(object.object3d, object.visible !== false);
+  }, [object.object3d, object.visible]);
 
   const syncOverlayGroupsToBody = (body) => {
     const translation = body.translation();
@@ -294,9 +303,9 @@ function ImportedSceneObject({
         />
       )}
 
-      {isHighlighted && <ObjectHighlight ref={highlightRef} object={object} />}
-      {isXrayed && <ObjectPhysicsXray ref={xrayRef} object={object} />}
-      {isLabeled && <ObjectInsightLabel ref={labelRef} object={object} />}
+      {isHighlighted && object.visible !== false && <ObjectHighlight ref={highlightRef} object={object} />}
+      {isXrayed && object.visible !== false && <ObjectPhysicsXray ref={xrayRef} object={object} />}
+      {isLabeled && object.visible !== false && <ObjectInsightLabel ref={labelRef} object={object} />}
     </>
   );
 }
@@ -481,6 +490,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const physicsXrayEnabled = useStore((state) => state.physicsXrayEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
+  const pictureMode = useStore((state) => state.pictureMode);
   const showtimeEnabled = useStore((state) => state.showtimeEnabled);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
   const setHighlightedObject = useStore((state) => state.setHighlightedObject);
@@ -559,6 +569,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
         maxPolarAngle={Math.PI / 1.8}
       />
 
+      {!pictureMode && (
       <GizmoHelper alignment="top-right" margin={[65, 100]}>
         <GizmoViewport
           axisColors={['#e8524a', '#6abf69', '#4d9de0']}
@@ -566,6 +577,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
           hideNegativeAxes={false}
         />
       </GizmoHelper>
+      )}
 
       <CameraTracker onUpdate={onCameraUpdate} />
       <CameraPositioner cameraTarget={cameraTarget} perspective={perspective} />

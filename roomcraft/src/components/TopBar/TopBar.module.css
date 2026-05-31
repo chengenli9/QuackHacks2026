@@ -233,3 +233,9 @@
   padding: var(--space-md);
   font-family: var(--font-ui);
 }
+
+.resetBtn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-ghost);
+}

@@ -7,6 +7,7 @@
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
+  position: relative;
 }
 
 /* Tab Toggle */
@@ -16,6 +17,7 @@
   gap: var(--space-xs);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  align-items: center;
 }
 
 .tab {
@@ -489,4 +491,57 @@
 .sendBtn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* === Resize handle === */
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 20;
+  transition: background 0.15s;
+}
+
+.resizeHandleRight {
+  right: -2px;
+}
+
+.resizeHandle:hover,
+.resizeHandle.active {
+  background: var(--accent-ghost);
+}
+
+/* === Collapse / expand buttons === */
+.collapseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.collapseBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.expandBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 36px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.expandBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }

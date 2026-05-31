@@ -230,6 +230,21 @@ const useStore = create((set, get) => ({
   setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
   setChatSubTab: (tab) => set({ chatSubTab: tab }),
 
+  // Panel layout (UI chrome — not project state)
+  leftPanelMinimized: false,
+  rightPanelMinimized: false,
+  leftPanelWidth: 240,
+  rightPanelWidth: 260,
+  toggleLeftPanel: () => set((s) => ({ leftPanelMinimized: !s.leftPanelMinimized })),
+  toggleRightPanel: () => set((s) => ({ rightPanelMinimized: !s.rightPanelMinimized })),
+  setLeftPanelWidth: (w) => set({ leftPanelWidth: w }),
+  setRightPanelWidth: (w) => set({ rightPanelWidth: w }),
+
+  // Picture mode — hides all UI chrome until the user clicks anywhere
+  pictureMode: false,
+  togglePictureMode: () => set((s) => ({ pictureMode: !s.pictureMode })),
+  exitPictureMode: () => set({ pictureMode: false }),
+
   // Viewport
   setActiveTool: (tool) => set({ activeTool: tool }),
   setViewMode: (mode) => set({ viewMode: mode }),
@@ -444,6 +459,27 @@ const useStore = create((set, get) => ({
     set((state) => ({
       sceneObjects: updateObjectPhysics(state.sceneObjects, objectId, patch),
     })),
+  toggleSceneObjectVisibility: (objectId) =>
+    set((state) => ({
+      sceneObjects: state.sceneObjects.map((object) =>
+        object.id === objectId ? { ...object, visible: object.visible === false } : object
+      ),
+    })),
+  deleteSceneObject: (objectId) =>
+    set((state) => {
+      const remaining = state.sceneObjects.filter((object) => object.id !== objectId);
+      const nextSelected =
+        state.selectedObjectId === objectId
+          ? (remaining[0]?.id ?? 'Room_Mesh')
+          : state.selectedObjectId;
+      const nextTransforms = { ...state.sceneObjectTransforms };
+      delete nextTransforms[objectId];
+      return {
+        sceneObjects: remaining,
+        selectedObjectId: nextSelected,
+        sceneObjectTransforms: nextTransforms,
+      };
+    }),
   applySceneOperation: (operation) =>
     set((state) => applySceneOperationToState(state, operation)),
   clearImportedScene: () =>
