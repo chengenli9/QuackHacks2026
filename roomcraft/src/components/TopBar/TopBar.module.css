@@ -86,6 +86,11 @@
   cursor: default;
 }
 
+.dropdownItem.actionable {
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 .dropdownItem:hover {
   background: var(--bg-hover);
   color: var(--text-secondary);

@@ -1,7 +1,3 @@
-import { useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { MeshStandardMaterial } from 'three';
-
 // A simple open-top box room: floor + 4 walls
 export default function PlaceholderRoom() {
   const matProps = { color: '#3a3a3a', roughness: 0.85, metalness: 0.05 };

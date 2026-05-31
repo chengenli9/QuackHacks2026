@@ -199,6 +199,86 @@
   letter-spacing: 0.05em;
 }
 
+.panelDivider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: var(--space-xs) 0;
+  flex-shrink: 0;
+}
+
+.importSummary {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: var(--space-sm);
+}
+
+.clearImportBtn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  color: var(--text-muted);
+}
+
+.clearImportBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.importName {
+  padding-right: 24px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.importMetaRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.importNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-radius: 4px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.importNotice svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.errorNotice {
+  border-color: #9f3f3f;
+  color: #ffb0a8;
+}
+
 /* === Chat Panel === */
 .chatPanel {
   flex: 1;
