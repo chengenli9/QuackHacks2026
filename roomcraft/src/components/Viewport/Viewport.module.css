@@ -260,6 +260,47 @@
   margin-top: 2px;
 }
 
+.physicsXrayLegend {
+  position: absolute;
+  left: var(--space-sm);
+  bottom: calc(var(--space-sm) + 58px);
+  z-index: 11;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(620px, 72vw);
+  overflow-x: auto;
+  padding: 7px 9px;
+  border: 1px solid rgba(45, 212, 191, 0.56);
+  border-radius: 5px;
+  background: rgba(12, 18, 22, 0.88);
+  color: var(--text-secondary);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  backdrop-filter: blur(6px);
+}
+
+.physicsXrayLegend strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.physicsXrayLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.physicsXrayLegend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  box-shadow: 0 0 10px currentColor;
+}
+
 .showtimeOverlay {
   position: absolute;
   right: var(--space-md);
@@ -413,5 +454,11 @@
     top: auto;
     bottom: var(--space-sm);
     width: auto;
+  }
+
+  .physicsXrayLegend {
+    right: var(--space-sm);
+    bottom: 68px;
+    max-width: none;
   }
 }

@@ -31,6 +31,10 @@ import {
   labelPositionForObject,
   shouldShowObjectInsightLabel,
 } from '../../lib/objectInsightLabels';
+import {
+  physicsXrayProfileForObject,
+  shouldShowPhysicsXray,
+} from '../../lib/physicsXray';
 import { rapierBodyTypeFor, rapierColliderFor } from '../../lib/rapierMapping';
 import styles from './Viewport.module.css';
 
@@ -109,12 +113,14 @@ function ImportedSceneObject({
   isSelected,
   isHighlighted,
   isLabeled,
+  isXrayed,
   collisionsEnabled,
   onDragStateChange,
 }) {
   const bodyRef = useRef(null);
   const hitboxRef = useRef(null);
   const highlightRef = useRef(null);
+  const xrayRef = useRef(null);
   const labelRef = useRef(null);
   const isEditorDraggingRef = useRef(false);
   const lastRuntimePositionRef = useRef(object.transform.position);
@@ -134,7 +140,7 @@ function ImportedSceneObject({
   const syncOverlayGroupsToBody = (body) => {
     const translation = body.translation();
     const rotation = body.rotation();
-    for (const group of [hitboxRef.current, highlightRef.current]) {
+    for (const group of [hitboxRef.current, highlightRef.current, xrayRef.current]) {
       if (!group) continue;
       group.position.set(translation.x, translation.y, translation.z);
       group.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
@@ -284,6 +290,7 @@ function ImportedSceneObject({
       )}
 
       {isHighlighted && <ObjectHighlight ref={highlightRef} object={object} />}
+      {isXrayed && <ObjectPhysicsXray ref={xrayRef} object={object} />}
       {isLabeled && <ObjectInsightLabel ref={labelRef} object={object} />}
     </>
   );
@@ -312,7 +319,13 @@ const ObjectSelectionHitbox = forwardRef(function ObjectSelectionHitbox({ object
   );
 });
 
-function ImportedPhysicsScene({ sceneObjects, selectedObjectId, objectLabelsEnabled, onDragStateChange }) {
+function ImportedPhysicsScene({
+  sceneObjects,
+  selectedObjectId,
+  objectLabelsEnabled,
+  physicsXrayEnabled,
+  onDragStateChange,
+}) {
   const gravityEnabled = useStore((state) => state.gravityEnabled);
   const collisionsEnabled = useStore((state) => state.collisionsEnabled);
   const floorEnabled = useStore((state) => state.floorEnabled);
@@ -329,6 +342,7 @@ function ImportedPhysicsScene({ sceneObjects, selectedObjectId, objectLabelsEnab
           isSelected={selectedObjectId === object.id}
           isHighlighted={highlightedObjectId === object.id}
           isLabeled={shouldShowObjectInsightLabel(object, objectLabelsEnabled)}
+          isXrayed={shouldShowPhysicsXray(object, physicsXrayEnabled)}
           collisionsEnabled={collisionsEnabled}
           onDragStateChange={onDragStateChange}
         />
@@ -355,6 +369,42 @@ const ObjectHighlight = forwardRef(function ObjectHighlight({ object }, ref) {
       >
         <boxGeometry args={dimensions} />
         <meshBasicMaterial color="#00e5ca" wireframe transparent opacity={0.9} depthTest={false} />
+      </mesh>
+    </group>
+  );
+});
+
+const ObjectPhysicsXray = forwardRef(function ObjectPhysicsXray({ object }, ref) {
+  const dimensions = object.localBoundsDimensions?.map((value) => Math.max(value, 0.14)) ?? [1, 1, 1];
+  const localCenter = object.localBoundsCenter ?? [0, 0, 0];
+  const profile = physicsXrayProfileForObject(object);
+
+  return (
+    <group
+      ref={ref}
+      position={object.transform.position}
+      rotation={object.transform.rotation}
+      scale={object.transform.scale}
+    >
+      <mesh position={localCenter} renderOrder={18} raycast={() => null}>
+        <boxGeometry args={dimensions} />
+        <meshBasicMaterial
+          color={profile.color}
+          transparent
+          opacity={0.16}
+          depthWrite={false}
+          depthTest={false}
+        />
+      </mesh>
+      <mesh position={localCenter} renderOrder={19} raycast={() => null}>
+        <boxGeometry args={dimensions.map((value) => value * 1.015)} />
+        <meshBasicMaterial
+          color={profile.color}
+          wireframe
+          transparent
+          opacity={0.92}
+          depthTest={false}
+        />
       </mesh>
     </group>
   );
@@ -423,6 +473,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const perspective = useStore((state) => state.perspective);
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
   const objectLabelsEnabled = useStore((state) => state.objectLabelsEnabled);
+  const physicsXrayEnabled = useStore((state) => state.physicsXrayEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
   const showtimeEnabled = useStore((state) => state.showtimeEnabled);
@@ -486,6 +537,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
           sceneObjects={renderableSceneObjects}
           selectedObjectId={selectedObjectId}
           objectLabelsEnabled={objectLabelsEnabled}
+          physicsXrayEnabled={physicsXrayEnabled}
           onDragStateChange={setIsTransforming}
         />
       )}

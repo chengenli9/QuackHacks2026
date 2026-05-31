@@ -12,11 +12,13 @@ import {
   ChevronRight,
   Grid3x3,
   Info,
+  ScanLine,
   Sparkles,
   X,
 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import { buildShowtimeSteps } from '../../lib/showtimeDirector';
+import { PHYSICS_XRAY_LEGEND } from '../../lib/physicsXray';
 import ThreeScene from './ThreeScene';
 import styles from './Viewport.module.css';
 
@@ -42,6 +44,8 @@ export default function Viewport() {
     toggleOverlays,
     objectLabelsEnabled,
     setObjectLabelsEnabled,
+    physicsXrayEnabled,
+    setPhysicsXrayEnabled,
     gravityEnabled,
     setGravityEnabled,
     collisionsEnabled,
@@ -178,6 +182,14 @@ export default function Viewport() {
         </button>
 
         <button
+          className={`${styles.toolbarBtn} ${physicsXrayEnabled ? styles.active : ''}`}
+          onClick={() => setPhysicsXrayEnabled(!physicsXrayEnabled)}
+          aria-pressed={physicsXrayEnabled}
+        >
+          <ScanLine size={12} /> Physics X-Ray
+        </button>
+
+        <button
           className={`${styles.toolbarBtn} ${gravityEnabled ? styles.active : ''}`}
           onClick={() => setGravityEnabled(!gravityEnabled)}
         >
@@ -260,6 +272,18 @@ export default function Viewport() {
             >
               <img src={background.imageDataUrl} alt="" />
             </button>
+          ))}
+        </div>
+      )}
+
+      {physicsXrayEnabled && (
+        <div className={styles.physicsXrayLegend} aria-label="Physics x-ray legend">
+          <strong>Physics X-Ray</strong>
+          {PHYSICS_XRAY_LEGEND.map((entry) => (
+            <span key={entry.key}>
+              <i style={{ background: entry.color }} />
+              {entry.label}
+            </span>
           ))}
         </div>
       )}

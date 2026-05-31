@@ -57,6 +57,7 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
     gravityEnabled: true,
     collisionsEnabled: false,
     objectLabelsEnabled: true,
+    physicsXrayEnabled: true,
     viewMode: 'wireframe',
     perspective: 'Top',
     sceneObjects: [object()],
@@ -80,6 +81,7 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.project.gravityEnabled, true);
   assert.equal(snapshot.project.collisionsEnabled, false);
   assert.equal(snapshot.project.objectLabelsEnabled, true);
+  assert.equal(snapshot.project.physicsXrayEnabled, true);
   assert.equal(snapshot.project.viewMode, 'wireframe');
   assert.equal(snapshot.project.perspective, 'Top');
   assert.equal(snapshot.project.highlightedObjectId, undefined);
@@ -113,6 +115,7 @@ test('serializeProjectState saves pre-showtime viewport state when presentation 
       perspective: 'Top',
       overlaysEnabled: false,
       objectLabelsEnabled: false,
+      physicsXrayEnabled: false,
       collisionsEnabled: false,
       floorEnabled: false,
       selectedObjectId: 'table_01',
@@ -125,6 +128,7 @@ test('serializeProjectState saves pre-showtime viewport state when presentation 
   assert.equal(snapshot.project.perspective, 'Top');
   assert.equal(snapshot.project.overlaysEnabled, false);
   assert.equal(snapshot.project.objectLabelsEnabled, false);
+  assert.equal(snapshot.project.physicsXrayEnabled, false);
   assert.equal(snapshot.project.collisionsEnabled, false);
   assert.equal(snapshot.project.floorEnabled, false);
   assert.equal(snapshot.project.selectedObjectId, 'table_01');
@@ -170,12 +174,14 @@ test('hydrateProjectSnapshot defaults newly added viewport fields for older save
   });
   delete snapshot.project.floorEnabled;
   delete snapshot.project.objectLabelsEnabled;
+  delete snapshot.project.physicsXrayEnabled;
   delete snapshot.project.backgroundGallery;
 
   const state = hydrateProjectSnapshot(snapshot);
 
   assert.equal(state.floorEnabled, true);
   assert.equal(state.objectLabelsEnabled, false);
+  assert.equal(state.physicsXrayEnabled, false);
   assert.deepEqual(state.backgroundGallery, []);
   assert.deepEqual(state.sceneObjects[0].localBoundsCenter, [0, 0, 0]);
   assert.deepEqual(state.sceneObjects[0].localBoundsDimensions, [0.4, 0.3, 0.5]);

@@ -185,6 +185,7 @@ test('showtime mode selects and highlights the focused demo object', () => {
     perspective: 'Top',
     overlaysEnabled: false,
     objectLabelsEnabled: false,
+    physicsXrayEnabled: false,
     collisionsEnabled: false,
     floorEnabled: false,
     sceneObjects: [
@@ -206,6 +207,7 @@ test('showtime mode selects and highlights the focused demo object', () => {
   assert.equal(state.perspective, 'Perspective');
   assert.equal(state.overlaysEnabled, true);
   assert.equal(state.objectLabelsEnabled, true);
+  assert.equal(state.physicsXrayEnabled, true);
   assert.equal(state.collisionsEnabled, true);
   assert.equal(state.floorEnabled, true);
 
@@ -224,6 +226,7 @@ test('showtime mode selects and highlights the focused demo object', () => {
   assert.equal(state.perspective, 'Top');
   assert.equal(state.overlaysEnabled, false);
   assert.equal(state.objectLabelsEnabled, false);
+  assert.equal(state.physicsXrayEnabled, false);
   assert.equal(state.collisionsEnabled, false);
   assert.equal(state.floorEnabled, false);
 });
@@ -240,6 +243,21 @@ test('object insight labels can be toggled independently from grid overlays', ()
   useStore.getState().toggleOverlays();
   state = useStore.getState();
   assert.equal(state.objectLabelsEnabled, true);
+  assert.equal(state.overlaysEnabled, false);
+});
+
+test('physics x-ray can be toggled independently from grid overlays', () => {
+  useStore.setState(useStore.getInitialState(), true);
+  assert.equal(useStore.getState().physicsXrayEnabled, false);
+
+  useStore.getState().setPhysicsXrayEnabled(true);
+  let state = useStore.getState();
+  assert.equal(state.physicsXrayEnabled, true);
+  assert.equal(state.overlaysEnabled, true);
+
+  useStore.getState().toggleOverlays();
+  state = useStore.getState();
+  assert.equal(state.physicsXrayEnabled, true);
   assert.equal(state.overlaysEnabled, false);
 });
 
