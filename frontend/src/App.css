@@ -1,0 +1,62 @@
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.viewport-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.right-panels {
+  width: var(--panel-width);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+@media (max-width: 760px) {
+  .app-layout {
+    height: 100dvh;
+    overflow-y: auto;
+  }
+
+  .app-body {
+    flex-direction: column;
+    overflow: visible;
+    min-height: auto;
+  }
+
+  .viewport-area {
+    order: 1;
+    min-height: 430px;
+    height: 52dvh;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .right-panels {
+    order: 3;
+    width: 100%;
+    min-height: 360px;
+    max-height: 440px;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+}
