@@ -137,6 +137,11 @@ function ImportedSceneObject({
     applyObjectAppearance(object.object3d, object.appearance, viewMode);
   }, [object.appearance, object.object3d, viewMode]);
 
+  useEffect(() => {
+    if (!object.object3d) return;
+    object.object3d.visible = object.visible !== false;
+  }, [object.object3d, object.visible]);
+
   const syncOverlayGroupsToBody = (body) => {
     const translation = body.translation();
     const rotation = body.rotation();
@@ -289,9 +294,9 @@ function ImportedSceneObject({
         />
       )}
 
-      {isHighlighted && <ObjectHighlight ref={highlightRef} object={object} />}
-      {isXrayed && <ObjectPhysicsXray ref={xrayRef} object={object} />}
-      {isLabeled && <ObjectInsightLabel ref={labelRef} object={object} />}
+      {isHighlighted && object.visible !== false && <ObjectHighlight ref={highlightRef} object={object} />}
+      {isXrayed && object.visible !== false && <ObjectPhysicsXray ref={xrayRef} object={object} />}
+      {isLabeled && object.visible !== false && <ObjectInsightLabel ref={labelRef} object={object} />}
     </>
   );
 }

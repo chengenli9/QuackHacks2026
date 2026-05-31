@@ -111,8 +111,34 @@
   color: var(--text-muted);
 }
 
+.visibilityBtnActive {
+  opacity: 1 !important;
+  color: var(--text-secondary);
+}
+
 .treeNode:hover .visibilityBtn {
   opacity: 1;
+}
+
+.deleteBtn {
+  opacity: 0;
+  transition: opacity 0.1s;
+  padding: 1px;
+  border-radius: 2px;
+  color: var(--text-muted);
+  margin-left: 1px;
+}
+
+.treeNode:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  color: #e8524a;
+}
+
+.hiddenNode {
+  opacity: 0.45;
 }
 
 /* === Properties Panel === */

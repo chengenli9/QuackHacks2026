@@ -68,6 +68,7 @@ export function normalizeSceneObject(object) {
   return {
     ...object,
     transform,
+    visible: object.visible !== false,
     localBoundsCenter: vec3(object.localBoundsCenter, [0, 0, 0]),
     localBoundsDimensions: vec3Unit(
       object.localBoundsDimensions,
