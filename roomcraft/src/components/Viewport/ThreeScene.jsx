@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   GizmoHelper,
@@ -12,24 +11,6 @@ import {
 } from '@react-three/drei';
 import { PCFShadowMap } from 'three';
 import useStore from '../../store/useStore';
-import { floorColliderForSceneObjects } from '../../lib/floorCollider';
-import { rapierBodyTypeFor, rapierColliderFor } from '../../lib/rapierMapping';
-
-function ChaoMan({ groupRef, onSelect }) {
-  const { scene } = useGLTF('/chaoman.glb');
-
-  return (
-    <group
-      ref={groupRef}
-      onClick={(event) => {
-        event.stopPropagation();
-        onSelect();
-      }}
-    >
-      <primitive object={scene} />
-    </group>
-  );
-}
 
 function CameraTracker({ onUpdate }) {
   useFrame(({ camera }) => {
@@ -50,51 +31,33 @@ function CameraPositioner({ target }) {
   return null;
 }
 
-function GroundCollider({ sceneObjects }) {
-  const floor = floorColliderForSceneObjects(sceneObjects);
-  const halfExtents = floor.args.map((value) => value / 2);
-
+function SelectableObject({ object, onSelect }) {
+  const groupRef = useRef();
   return (
-    <RigidBody type="fixed" colliders={false}>
-      <CuboidCollider args={halfExtents} position={floor.position} />
-    </RigidBody>
-  );
-}
-
-function ImportedSceneObject({ object }) {
-  return (
-    <RigidBody
-      type={rapierBodyTypeFor(object.physics)}
-      colliders={rapierColliderFor(object.physics)}
-      mass={object.physics.static ? undefined : object.physics.massKg}
-      friction={object.physics.friction}
-      restitution={object.physics.restitution}
-      linearDamping={0.15}
-      angularDamping={0.15}
+    <group
+      ref={groupRef}
+      onClick={(e) => { e.stopPropagation(); onSelect(groupRef.current); }}
     >
       <primitive object={object.object3d} />
-    </RigidBody>
+    </group>
   );
 }
 
-function ImportedPhysicsScene({ sceneObjects }) {
-  return (
-    <Physics gravity={[0, -9.81, 0]}>
-      <GroundCollider sceneObjects={sceneObjects} />
-      {sceneObjects.map((object) => (
-        <ImportedSceneObject key={object.id} object={object} />
-      ))}
-    </Physics>
-  );
-}
-
-function DefaultInteractiveScene() {
-  const meshRef = useRef();
-  const [selectedObj, setSelectedObj] = useState(null);
+function InteractiveScene({ sceneObjects, selectedObj, onSelect }) {
+  const chaomanRef = useRef();
+  // const { scene: chaomanScene } = useGLTF('/chaoman.glb');
 
   return (
     <>
-      <ChaoMan groupRef={meshRef} onSelect={() => setSelectedObj(meshRef.current)} />
+      <group
+        ref={chaomanRef}
+        onClick={(e) => { e.stopPropagation(); onSelect(chaomanRef.current); }}
+      >
+        {/* <primitive object={chaomanScene} /> */}
+      </group>
+      {sceneObjects.map((obj) => (
+        <SelectableObject key={obj.id} object={obj} onSelect={onSelect} />
+      ))}
       {selectedObj && <TransformControls object={selectedObj} mode="translate" />}
     </>
   );
@@ -102,6 +65,13 @@ function DefaultInteractiveScene() {
 
 export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const sceneObjects = useStore((state) => state.sceneObjects);
+  const deletedNodeIds = useStore((state) => state.deletedNodeIds);
+  const hiddenNodeIds = useStore((state) => state.hiddenNodeIds);
+  const [selectedObj, setSelectedObj] = useState(null);
+
+  const del = (id) => deletedNodeIds.includes(id);
+  const hidden = (id) => hiddenNodeIds.includes(id);
+  const visibleObjects = sceneObjects.filter((o) => !del(o.id) && !hidden(o.id));
 
   return (
     <Canvas
@@ -140,8 +110,11 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
         infiniteGrid
       />
 
-      <DefaultInteractiveScene />
-      {sceneObjects.length > 0 && <ImportedPhysicsScene sceneObjects={sceneObjects} />}
+      <InteractiveScene
+        sceneObjects={visibleObjects}
+        selectedObj={selectedObj}
+        onSelect={setSelectedObj}
+      />
 
       <OrbitControls
         makeDefault

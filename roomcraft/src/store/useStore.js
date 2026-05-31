@@ -20,12 +20,47 @@ const useStore = create((set) => ({
   // Hierarchy
   selectedObjectId: 'Room_Mesh',
   expandedNodes: ['Scene', 'Room_Mesh', 'Lights'],
+  deletedNodeIds: [],
+  hiddenNodeIds: [],
   setSelectedObject: (id) => set({ selectedObjectId: id }),
   toggleNode: (id) =>
     set((state) => ({
       expandedNodes: state.expandedNodes.includes(id)
         ? state.expandedNodes.filter((nodeId) => nodeId !== id)
         : [...state.expandedNodes, id],
+    })),
+  deleteNode: (id) =>
+    set((state) => ({
+      deletedNodeIds: state.deletedNodeIds.includes(id)
+        ? state.deletedNodeIds
+        : [...state.deletedNodeIds, id],
+    })),
+  toggleNodeVisibility: (id) =>
+    set((state) => ({
+      hiddenNodeIds: state.hiddenNodeIds.includes(id)
+        ? state.hiddenNodeIds.filter((n) => n !== id)
+        : [...state.hiddenNodeIds, id],
+    })),
+
+  // Imported GLB scene
+  glbImportRequestId: 0,
+  importedGlbFileName: null,
+  glbImportStatus: 'idle',
+  glbImportError: null,
+  glbImportWarnings: [],
+  vlmEstimateStatus: 'idle',
+  sceneObjects: [],
+  requestGlbImport: () =>
+    set((state) => ({
+      deletedNodeIds: state.deletedNodeIds.includes(id)
+        ? state.deletedNodeIds
+        : [...state.deletedNodeIds, id],
+    })),
+  toggleNodeVisibility: (id) =>
+    set((state) => ({
+      hiddenNodeIds: state.hiddenNodeIds.includes(id)
+        ? state.hiddenNodeIds.filter((n) => n !== id)
+        : [...state.hiddenNodeIds, id],
     })),
 
   // Imported GLB scene
