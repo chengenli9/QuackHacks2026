@@ -65,6 +65,33 @@ class FakeBackgroundImageGenerator implements BackgroundImageGenerator {
   }
 }
 
+const ENV_KEYS = ["GEMINI_API_KEY", "GEMINI_MODEL", "GEMINI_BASE_URL"] as const;
+const ORIGINAL_ENV = Object.fromEntries(
+  ENV_KEYS.map((key) => [key, process.env[key]])
+) as Record<(typeof ENV_KEYS)[number], string | undefined>;
+
+function setCommandEnv(values: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>>) {
+  for (const key of ENV_KEYS) {
+    const value = values[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+function restoreCommandEnv() {
+  for (const key of ENV_KEYS) {
+    const value = ORIGINAL_ENV[key];
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
 describe("backend API", () => {
   let app: FastifyInstance | undefined;
 
@@ -73,51 +100,110 @@ describe("backend API", () => {
       await app.close();
       app = undefined;
     }
+    vi.unstubAllGlobals();
+    restoreCommandEnv();
   });
 
-  it("parses a generated asset chat command into a validated operation", async () => {
+  it("does not apply deterministic command tools when Gemini is not configured", async () => {
+    setCommandEnv({
+      GEMINI_API_KEY: undefined,
+      GEMINI_MODEL: undefined,
+      GEMINI_BASE_URL: undefined
+    });
     app = await createApp({ assetGenerator: new FakeAssetGenerator() });
 
     const response = await app.inject({
       method: "POST",
       url: "/api/command",
       payload: {
-        message: "add a rubber duck on the coffee table",
+        message: "make the duck bouncier",
         sceneContext: {
-          objects: [{ id: "coffee_table_01", label: "coffee table" }]
+          objects: [{ id: "duck_01", label: "rubber duck" }]
         }
       }
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      operation: {
-        action: "add_generated_object",
-        prompt: "rubber duck",
-        placement: { mode: "on_object", target: "coffee_table_01" },
-        fallbackAssetKey: "duck"
-      }
+    expect(response.json()).toEqual({
+      message: "Gemini command agent is not configured. Set GEMINI_API_KEY on the backend to enable chat-driven scene edits."
     });
-    expect(response.json().thoughts).toEqual([
-      "1. Create \"rubber duck\" and place it in the scene."
-    ]);
   });
 
-  it("parses common non-generation chat commands", async () => {
+  it("uses Gemini as the default command parser when configured", async () => {
+    setCommandEnv({
+      GEMINI_API_KEY: "gemini-key",
+      GEMINI_MODEL: "gemini-3.5-flash",
+      GEMINI_BASE_URL: "https://generativelanguage.googleapis.com/v1beta"
+    });
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      operation: {
+                        action: "generate_background_image",
+                        prompt: "low-poly field with a black sky with orange highlights"
+                      },
+                      thoughts: ["Create a scene-wide background image."]
+                    })
+                  }
+                ]
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
     app = await createApp({ assetGenerator: new FakeAssetGenerator() });
 
-    const gravity = await app.inject({
+    const response = await app.inject({
       method: "POST",
       url: "/api/command",
-      payload: { message: "turn gravity on", sceneContext: { objects: [] } }
+      payload: {
+        message: "Make the background a low-poly field with a black sky with orange highlights",
+        sceneContext: {
+          objects: [{ id: "geometry_4", label: "geometry 4" }],
+          selectedObjectId: "geometry_4"
+        }
+      }
     });
-    expect(gravity.statusCode).toBe(200);
-    expect(gravity.json()).toMatchObject({
-      operation: { action: "toggle_gravity", enabled: true }
-    });
-    expect(gravity.json().thoughts).toEqual(["1. Turn gravity on."]);
 
-    const bouncy = await app.inject({
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      operation: {
+        action: "generate_background_image",
+        prompt: "low-poly field with a black sky with orange highlights"
+      },
+      thoughts: ["Create a scene-wide background image."]
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/models/gemini-3.5-flash:generateContent");
+  });
+
+  it("does not fall back to deterministic command tools when Gemini fails", async () => {
+    setCommandEnv({
+      GEMINI_API_KEY: "gemini-key",
+      GEMINI_MODEL: "gemini-3.5-flash",
+      GEMINI_BASE_URL: "https://generativelanguage.googleapis.com/v1beta"
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ error: { message: "model unavailable" } }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" }
+        })
+      )
+    );
+    app = await createApp({ assetGenerator: new FakeAssetGenerator() });
+
+    const response = await app.inject({
       method: "POST",
       url: "/api/command",
       payload: {
@@ -125,15 +211,12 @@ describe("backend API", () => {
         sceneContext: { objects: [{ id: "duck_01", label: "rubber duck" }] }
       }
     });
-    expect(bouncy.statusCode).toBe(200);
-    expect(bouncy.json()).toMatchObject({
-      operation: {
-        action: "update_object_physics",
-        target: "duck_01",
-        changes: { restitution: 0.85 }
-      }
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      error: "GeminiRequestFailed"
     });
-    expect(bouncy.json().thoughts).toEqual(["1. Update physics on duck_01."]);
+    expect(response.json()).not.toHaveProperty("operation");
   });
 
   it("routes chat commands through the configured command parser provider", async () => {

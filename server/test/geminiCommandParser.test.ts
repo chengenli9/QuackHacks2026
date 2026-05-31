@@ -40,18 +40,12 @@ describe("GeminiCommandParser", () => {
       sceneContext: { objects: [{ id: "duck_01", label: "rubber duck" }] }
     });
 
-    expect(requestBody.generationConfig.responseMimeType).toBe("application/json");
-    expect(requestBody.generationConfig.responseJsonSchema.properties.operation).toBeDefined();
-    expect(requestBody.generationConfig.responseJsonSchema.properties.operations).toBeDefined();
-    expect(requestBody.generationConfig.responseJsonSchema.properties.operation.properties.target).toBeDefined();
-    expect(requestBody.generationConfig.responseJsonSchema.properties.operation.properties.changes).toBeDefined();
-    expect(
-      requestBody.generationConfig.responseJsonSchema.properties.operation.properties.action.enum
-    ).toContain("update_object_appearance");
-    expect(
-      requestBody.generationConfig.responseJsonSchema.properties.operation.properties.action.enum
-    ).toContain("generate_environment_scene");
+    expect(requestBody.generationConfig).toEqual({
+      responseMimeType: "application/json"
+    });
     expect(requestBody.contents[0].parts[0].text).toContain("Available tools");
+    expect(requestBody.contents[0].parts[0].text).toContain("update_object_appearance");
+    expect(requestBody.contents[0].parts[0].text).toContain("generate_environment_scene");
     expect(requestBody.contents[0].parts[0].text).toContain("Reply conversationally");
     expect(requestBody.contents[0].parts[0].text).toContain("one or more ordered editor tool calls");
     expect(requestBody.contents[0].parts[0].text).toContain("one tool call per target object");
@@ -235,6 +229,113 @@ describe("GeminiCommandParser", () => {
     expect(prompt).toContain('"label":"decorative metal tray"');
   });
 
+  it("instructs Gemini not to turn scene-wide background requests into selected-object edits", async () => {
+    let requestBody: any;
+    const parser = new GeminiCommandParser({
+      apiKey: "gemini-key",
+      model: "gemini-3.5-flash",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      fetch: async (_url, init) => {
+        requestBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        operation: {
+                          action: "generate_background_image",
+                          prompt: "low-poly field with a black sky with orange highlights"
+                        }
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    });
+
+    await expect(
+      parser.parse({
+        message: "Make the background a low-poly field with a black sky with orange highlights",
+        sceneContext: {
+          objects: [{ id: "geometry_4", label: "geometry 4" }],
+          selectedObjectId: "geometry_4"
+        }
+      })
+    ).resolves.toEqual({
+      operation: {
+        action: "generate_background_image",
+        prompt: "low-poly field with a black sky with orange highlights"
+      }
+    });
+
+    const prompt = requestBody.contents[0].parts[0].text;
+    expect(prompt).toContain("Do not assume the selected object is the target");
+    expect(prompt).toContain("Background, backdrop, sky, horizon, and environment-image requests are scene-wide");
+    expect(prompt).toContain("not update_object_appearance");
+    expect(prompt).toContain('"selectedObjectId":"geometry_4"');
+  });
+
+  it("normalizes Gemini JSON-mode tool aliases before schema validation", async () => {
+    const parser = new GeminiCommandParser({
+      apiKey: "gemini-key",
+      model: "gemini-3.5-flash",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        thoughts: "Create a scene-wide background image.",
+                        operations: [
+                          {
+                            tool: "generate_background_image",
+                            arguments: {
+                              prompt: "low-poly field with a black sky with orange highlights"
+                            }
+                          }
+                        ]
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    });
+
+    await expect(
+      parser.parse({
+        message: "Make the background a low-poly field with a black sky with orange highlights",
+        sceneContext: {
+          objects: [{ id: "geometry_4", label: "geometry 4" }],
+          selectedObjectId: "geometry_4"
+        }
+      })
+    ).resolves.toEqual({
+      thoughts: ["Create a scene-wide background image."],
+      operations: [
+        {
+          action: "generate_background_image",
+          prompt: "low-poly field with a black sky with orange highlights"
+        }
+      ]
+    });
+  });
+
   it("normalizes Gemini color names into validated appearance operations", async () => {
     const parser = new GeminiCommandParser({
       apiKey: "gemini-key",
@@ -276,6 +377,74 @@ describe("GeminiCommandParser", () => {
         target: "duck_01",
         changes: { baseColor: "#dc143c", metalness: 0.2 }
       }
+    });
+  });
+
+  it("normalizes Gemini appearance change aliases before validation", async () => {
+    const parser = new GeminiCommandParser({
+      apiKey: "gemini-key",
+      model: "gemini-3.5-flash",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        operations: [
+                          {
+                            tool: "update_object_appearance",
+                            arguments: {
+                              target: "geometry_1",
+                              changes: { color: "red" }
+                            }
+                          },
+                          {
+                            tool: "update_object_appearance",
+                            arguments: {
+                              target: "geometry_4",
+                              changes: { color: "red" }
+                            }
+                          }
+                        ]
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    });
+
+    await expect(
+      parser.parse({
+        message: "mske the objcts red",
+        sceneContext: {
+          objects: [
+            { id: "geometry_1", label: "geometry 1" },
+            { id: "geometry_4", label: "geometry 4" }
+          ],
+          selectedObjectId: "geometry_4"
+        }
+      })
+    ).resolves.toEqual({
+      operations: [
+        {
+          action: "update_object_appearance",
+          target: "geometry_1",
+          changes: { baseColor: "#ff0000" }
+        },
+        {
+          action: "update_object_appearance",
+          target: "geometry_4",
+          changes: { baseColor: "#ff0000" }
+        }
+      ]
     });
   });
 });

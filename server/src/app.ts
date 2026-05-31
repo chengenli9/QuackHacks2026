@@ -31,8 +31,7 @@ import { GeneratedAssetCache } from "./services/generatedAssetCache.js";
 import type { ImageConverter } from "./services/imageConversion.js";
 import { LocalObjectPropertyEstimator } from "./services/localObjectPropertyEstimator.js";
 import { MeshyTaskStore } from "./services/meshyTaskStore.js";
-import { RuleCommandParser } from "./services/commandParser.js";
-import { FallbackCommandParser } from "./services/fallbackCommandParser.js";
+import { UnavailableCommandParser } from "./services/unavailableCommandParser.js";
 import { FallbackObjectPropertyEstimator } from "./services/fallbackObjectPropertyEstimator.js";
 
 export type AppOptions = {
@@ -196,17 +195,14 @@ const createDefaultCommandParser = (): CommandParser => {
   const config = loadConfig();
 
   if (!config.geminiApiKey) {
-    return new RuleCommandParser();
+    return new UnavailableCommandParser();
   }
 
-  return new FallbackCommandParser(
-    new GeminiCommandParser({
-      apiKey: config.geminiApiKey,
-      model: config.geminiModel,
-      baseUrl: config.geminiBaseUrl
-    }),
-    new RuleCommandParser()
-  );
+  return new GeminiCommandParser({
+    apiKey: config.geminiApiKey,
+    model: config.geminiModel,
+    baseUrl: config.geminiBaseUrl
+  });
 };
 
 const createDefaultBackgroundImageGenerator = (): BackgroundImageGenerator => {

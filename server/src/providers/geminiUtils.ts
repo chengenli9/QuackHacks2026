@@ -28,8 +28,15 @@ export async function requestGeminiJson<T>({
   model: string;
   fetch: FetchLike;
   contents: unknown[];
-  responseJsonSchema: unknown;
+  responseJsonSchema?: unknown;
 }): Promise<T> {
+  const generationConfig: Record<string, unknown> = {
+    responseMimeType: "application/json"
+  };
+  if (responseJsonSchema) {
+    generationConfig.responseJsonSchema = responseJsonSchema;
+  }
+
   const response = await fetch(
     `${baseUrl.replace(/\/+$/, "")}/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -40,10 +47,7 @@ export async function requestGeminiJson<T>({
       },
       body: JSON.stringify({
         contents,
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseJsonSchema
-        }
+        generationConfig
       })
     }
   );

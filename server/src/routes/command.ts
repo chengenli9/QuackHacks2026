@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { commandRequestSchema } from "../schemas.js";
 import type { CommandParser } from "../providers/CommandParser.js";
-import { RuleCommandParser } from "../services/commandParser.js";
+import { UnavailableCommandParser } from "../services/unavailableCommandParser.js";
 
 export const registerCommandRoutes = async (
   app: FastifyInstance,
-  commandParser: CommandParser = new RuleCommandParser()
+  commandParser: CommandParser = new UnavailableCommandParser()
 ) => {
   app.post("/api/command", async (request, reply) => {
     const body = commandRequestSchema.parse(request.body);
