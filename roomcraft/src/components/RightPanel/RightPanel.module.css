@@ -281,6 +281,14 @@
   font-family: var(--font-ui);
   font-size: var(--font-size-xs);
   text-align: right;
+  cursor: text;
+}
+
+.xyzInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .transformRow {

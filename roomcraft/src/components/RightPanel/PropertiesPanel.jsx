@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useStore from '../../store/useStore';
 import styles from './RightPanel.module.css';
 
@@ -24,19 +24,47 @@ function formatFixed(value) {
   return Number.isFinite(value) ? value.toFixed(2) : '0.00';
 }
 
-function XYZRow({ label, values }) {
+function XYZRow({ label, values, onChange }) {
+  const [localVals, setLocalVals] = useState(() => values.map((v) => (Number.isFinite(+v) ? +v : 0).toFixed(2)));
+  const editing = useRef(new Set());
+
+  useEffect(() => {
+    setLocalVals((prev) =>
+      prev.map((v, i) => (editing.current.has(i) ? v : (Number.isFinite(+values[i]) ? +values[i] : 0).toFixed(2)))
+    );
+  }, [values]);
+
+  function commit(i) {
+    editing.current.delete(i);
+    const nums = localVals.map((v) => parseFloat(v) || 0);
+    onChange?.(nums);
+  }
+
   return (
     <div className={styles.transformRow}>
       <span className={styles.transformLabel}>{label}</span>
       <div className={styles.xyzRow} style={{ flex: 1 }}>
-        {['X', 'Y', 'Z'].map((axis, index) => (
+        {['X', 'Y', 'Z'].map((axis, i) => (
           <div key={axis} style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 2 }}>
-            <span className={styles.xyzLabel} style={{ color: axis === 'X' ? '#e8524a' : axis === 'Y' ? '#6abf69' : '#4d9de0' }}>{axis}</span>
+            <span className={styles.xyzLabel} style={{ color: axis === 'X' ? '#e8524a' : axis === 'Y' ? '#6abf69' : '#4d9de0' }}>
+              {axis}
+            </span>
             <input
               className={styles.xyzInput}
-              value={formatFixed(values[index])}
-              readOnly
+              value={localVals[i]}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (/^-?\d*\.?\d*$/.test(val)) {
+                  const next = [...localVals];
+                  next[i] = val;
+                  setLocalVals(next);
+                }
+              }}
+              onFocus={() => editing.current.add(i)}
+              onBlur={() => commit(i)}
+              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
               aria-label={`${label} ${axis}`}
+              inputMode="decimal"
             />
           </div>
         ))}
@@ -82,7 +110,7 @@ function ImportedPhysicsSection({ object }) {
 }
 
 export default function PropertiesPanel() {
-  const { selectedObjectId, sceneObjects } = useStore();
+  const { selectedObjectId, sceneObjects, selectedTransform, setPendingTransform } = useStore();
   const selected = selectedObjectId || 'Room_Mesh';
   const selectedSceneObject = sceneObjects.find((object) => object.id === selected);
   const data = selectedSceneObject
@@ -99,9 +127,9 @@ export default function PropertiesPanel() {
   const [colorByObject, setColorByObject] = useState({});
   const color = colorByObject[selected] ?? data.color;
 
-  const location = selectedSceneObject?.center ?? [0, 0, 0];
-  const rotation = [0, 0, 0];
-  const scale = selectedSceneObject?.dimensions ?? [1, 1, 1];
+  const location = selectedTransform?.position ?? selectedSceneObject?.center ?? [0, 0, 0];
+  const rotation = selectedTransform?.rotation ?? [0, 0, 0];
+  const scale = selectedTransform?.scale ?? selectedSceneObject?.dimensions ?? [1, 1, 1];
 
   return (
     <div className={styles.propertiesPanel}>
@@ -115,9 +143,9 @@ export default function PropertiesPanel() {
       <div className={styles.transformScroll}>
         <div className={styles.propSection}>
           <div className={styles.propSectionHeader}>Transform</div>
-          <XYZRow label="Location" values={location} />
-          <XYZRow label="Rotation" values={rotation} />
-          <XYZRow label="Scale" values={scale} />
+          <XYZRow label="Location" values={location} onChange={(pos) => setPendingTransform({ position: pos })} />
+          <XYZRow label="Rotation" values={rotation} onChange={(rot) => setPendingTransform({ rotation: rot })} />
+          <XYZRow label="Scale" values={scale} onChange={(scl) => setPendingTransform({ scale: scl })} />
         </div>
       </div>
 

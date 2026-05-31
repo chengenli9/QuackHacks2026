@@ -9,7 +9,7 @@ import {
   TransformControls,
   useGLTF,
 } from '@react-three/drei';
-import { PCFShadowMap } from 'three';
+import { PCFShadowMap, MathUtils } from 'three';
 import useStore from '../../store/useStore';
 
 function CameraTracker({ onUpdate }) {
@@ -45,7 +45,75 @@ function SelectableObject({ object, onSelect }) {
 
 function InteractiveScene({ sceneObjects, selectedObj, onSelect }) {
   const chaomanRef = useRef();
-  // const { scene: chaomanScene } = useGLTF('/chaoman.glb');
+  const activeTool = useStore((s) => s.activeTool);
+  const setSelectedTransform = useStore((s) => s.setSelectedTransform);
+  const pendingTransform = useStore((s) => s.pendingTransform);
+  const clearPendingTransform = useStore((s) => s.clearPendingTransform);
+  const { controls: orbitControls } = useThree();
+
+  const tcMode = activeTool === 'move' ? 'translate'
+               : activeTool === 'rotate' ? 'rotate'
+               : activeTool === 'scale' ? 'scale'
+               : null;
+
+  function syncToStore() {
+    if (!selectedObj) return;
+    const p = selectedObj.position;
+    const r = selectedObj.rotation;
+    const s = selectedObj.scale;
+    setSelectedTransform({
+      position: [p.x, p.y, p.z],
+      rotation: [MathUtils.radToDeg(r.x), MathUtils.radToDeg(r.y), MathUtils.radToDeg(r.z)],
+      scale: [s.x, s.y, s.z],
+    });
+  }
+
+  // Sync transform when selection changes
+  useEffect(() => {
+    if (!selectedObj) { setSelectedTransform(null); return; }
+    syncToStore();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedObj]);
+
+  // Apply transform typed in Properties panel
+  useEffect(() => {
+    if (!pendingTransform || !selectedObj) return;
+    const { position, rotation, scale } = pendingTransform;
+    if (position) selectedObj.position.set(position[0], position[1], position[2]);
+    if (rotation) selectedObj.rotation.set(
+      MathUtils.degToRad(rotation[0]),
+      MathUtils.degToRad(rotation[1]),
+      MathUtils.degToRad(rotation[2])
+    );
+    if (scale) selectedObj.scale.set(scale[0], scale[1], scale[2]);
+    clearPendingTransform();
+    syncToStore();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingTransform, selectedObj]);
+
+  // Emissive highlight when Select tool is active
+  useEffect(() => {
+    if (!selectedObj || activeTool !== 'select') return;
+    const toRestore = [];
+    selectedObj.traverse((child) => {
+      if (child.isMesh) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => {
+          if (m && m.emissive) {
+            toRestore.push({ m, e: m.emissive.clone(), ei: m.emissiveIntensity });
+            m.emissive.set(0x4d9de0);
+            m.emissiveIntensity = 0.35;
+          }
+        });
+      }
+    });
+    return () => {
+      toRestore.forEach(({ m, e, ei }) => {
+        m.emissive.copy(e);
+        m.emissiveIntensity = ei;
+      });
+    };
+  }, [selectedObj, activeTool]);
 
   return (
     <>
@@ -58,7 +126,15 @@ function InteractiveScene({ sceneObjects, selectedObj, onSelect }) {
       {sceneObjects.map((obj) => (
         <SelectableObject key={obj.id} object={obj} onSelect={onSelect} />
       ))}
-      {selectedObj && <TransformControls object={selectedObj} mode="translate" />}
+      {selectedObj && tcMode && (
+        <TransformControls
+          object={selectedObj}
+          mode={tcMode}
+          onChange={syncToStore}
+          onMouseDown={() => { if (orbitControls) orbitControls.enabled = false; }}
+          onMouseUp={() => { if (orbitControls) orbitControls.enabled = true; }}
+        />
+      )}
     </>
   );
 }

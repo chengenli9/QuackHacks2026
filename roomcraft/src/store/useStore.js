@@ -51,17 +51,14 @@ const useStore = create((set) => ({
   vlmEstimateStatus: 'idle',
   sceneObjects: [],
   requestGlbImport: () =>
-    set((state) => ({
-      deletedNodeIds: state.deletedNodeIds.includes(id)
-        ? state.deletedNodeIds
-        : [...state.deletedNodeIds, id],
-    })),
-  toggleNodeVisibility: (id) =>
-    set((state) => ({
-      hiddenNodeIds: state.hiddenNodeIds.includes(id)
-        ? state.hiddenNodeIds.filter((n) => n !== id)
-        : [...state.hiddenNodeIds, id],
-    })),
+    set((state) => ({ glbImportRequestId: state.glbImportRequestId + 1 })),
+
+  // Selected object transform (live-synced from 3D scene)
+  selectedTransform: null,
+  setSelectedTransform: (t) => set({ selectedTransform: t }),
+  pendingTransform: null,
+  setPendingTransform: (t) => set({ pendingTransform: t }),
+  clearPendingTransform: () => set({ pendingTransform: null }),
 
   // Imported GLB scene
   glbImportRequestId: 0,
