@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_REQUEST_BODY_LIMIT_BYTES,
   loadConfig,
   loadEnvFile
 } from "../src/config.js";
@@ -12,6 +13,11 @@ describe("server config", () => {
   it("defaults Gemini to 3.5 Flash", () => {
     expect(loadConfig({}).geminiModel).toBe(DEFAULT_GEMINI_MODEL);
     expect(DEFAULT_GEMINI_MODEL).toBe("gemini-3.5-flash");
+  });
+
+  it("uses a large request body limit for project GLB saves", () => {
+    expect(loadConfig({}).requestBodyLimitBytes).toBe(DEFAULT_REQUEST_BODY_LIMIT_BYTES);
+    expect(loadConfig({ REQUEST_BODY_LIMIT_BYTES: "2097152" }).requestBodyLimitBytes).toBe(2_097_152);
   });
 
   it("loads server .env values without overwriting existing process env", () => {

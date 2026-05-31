@@ -393,3 +393,55 @@ test('primary project storage falls back to the mirror when reads or lists fail'
   assert.deepEqual(await readSavedProject(storage, 'mirror-project'), snapshot);
   assert.equal((await storage.listProjects())[0].id, 'mirror-project');
 });
+
+test('primary project storage reads the newest snapshot when the remote copy is stale', async () => {
+  const staleRemoteSnapshot = serializeProjectState({
+    currentView: 'editor',
+    projectId: 'roomcraft-demo',
+    projectName: 'RoomCraft Demo',
+    sceneObjects: [object({ id: 'old_duck', label: 'old duck' })],
+  });
+  staleRemoteSnapshot.savedAt = '2026-05-30T22:00:00.000Z';
+  const newerMirrorSnapshot = serializeProjectState({
+    currentView: 'editor',
+    projectId: 'roomcraft-demo',
+    projectName: 'RoomCraft Demo',
+    sceneObjects: [object({ id: 'new_duck', label: 'new duck' })],
+  });
+  newerMirrorSnapshot.savedAt = '2026-05-30T22:05:00.000Z';
+  const primary = createMemoryProjectStorage();
+  const mirror = createMemoryProjectStorage();
+  await writeSavedProject(staleRemoteSnapshot, primary, 'roomcraft-demo');
+  await writeSavedProject(newerMirrorSnapshot, mirror, 'roomcraft-demo');
+
+  const storage = createPrimaryProjectStorage(primary, mirror);
+
+  assert.deepEqual(await readSavedProject(storage, 'roomcraft-demo'), newerMirrorSnapshot);
+});
+
+test('merged project lists keep the newest project summary when remote is stale', async () => {
+  const staleRemoteSnapshot = serializeProjectState({
+    currentView: 'editor',
+    projectId: 'roomcraft-demo',
+    projectName: 'Remote Stale Room',
+    sceneObjects: [object({ id: 'old_duck', label: 'old duck' })],
+  });
+  staleRemoteSnapshot.savedAt = '2026-05-30T22:00:00.000Z';
+  const newerMirrorSnapshot = serializeProjectState({
+    currentView: 'editor',
+    projectId: 'roomcraft-demo',
+    projectName: 'Local Latest Room',
+    sceneObjects: [object({ id: 'new_duck', label: 'new duck' })],
+  });
+  newerMirrorSnapshot.savedAt = '2026-05-30T22:05:00.000Z';
+  const primary = createMemoryProjectStorage();
+  const mirror = createMemoryProjectStorage();
+  await writeSavedProject(staleRemoteSnapshot, primary, 'roomcraft-demo');
+  await writeSavedProject(newerMirrorSnapshot, mirror, 'roomcraft-demo');
+
+  const projects = await createPrimaryProjectStorage(primary, mirror).listProjects();
+
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].name, 'Local Latest Room');
+  assert.equal(projects[0].savedAt, '2026-05-30T22:05:00.000Z');
+});

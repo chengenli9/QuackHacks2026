@@ -174,4 +174,40 @@ describe("project persistence API", () => {
     expect(background.statusCode).toBe(200);
     expect(background.body).toBe("png");
   });
+
+  it("accepts large data-url GLBs when saving project folders", async () => {
+    const projectStorageDir = mkdtempSync(join(tmpdir(), "roomcraft-projects-"));
+    app = await createApp({
+      projectStorageDir,
+      publicBaseUrl: "http://localhost:8787"
+    });
+    const largeBase64Glb = "A".repeat(1_200_000);
+    const snapshot = {
+      version: 1,
+      savedAt: "2026-05-30T23:00:00.000Z",
+      project: {
+        projectId: "large-glb-project",
+        projectName: "Large GLB Project",
+        sceneObjects: [{ id: "asset_large", label: "large asset", source: { assetId: "asset_large" } }],
+        assetSources: [
+          {
+            id: "asset_large",
+            type: "data-url",
+            fileName: "large.glb",
+            mimeType: "model/gltf-binary",
+            dataUrl: `data:model/gltf-binary;base64,${largeBase64Glb}`
+          }
+        ]
+      }
+    };
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/api/projects/large-glb-project",
+      payload: snapshot
+    });
+
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({ ok: true, projectId: "large-glb-project" });
+  });
 });

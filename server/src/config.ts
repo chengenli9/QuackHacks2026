@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
 export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
+export const DEFAULT_REQUEST_BODY_LIMIT_BYTES = 100 * 1024 * 1024;
 
 export type ServerConfig = {
   host: string;
@@ -20,6 +21,7 @@ export type ServerConfig = {
   generatedAssetStorageDir: string;
   fallbackAssetDir: string;
   projectStorageDir: string;
+  requestBodyLimitBytes: number;
 };
 
 export const loadEnvFile = (
@@ -69,6 +71,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
   ),
   projectStorageDir: resolve(
     env.PROJECT_STORAGE_DIR ?? "storage/projects"
+  ),
+  requestBodyLimitBytes: Number(
+    env.REQUEST_BODY_LIMIT_BYTES ?? DEFAULT_REQUEST_BODY_LIMIT_BYTES
   )
 });
 

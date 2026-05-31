@@ -222,11 +222,30 @@ export function createHybridProjectStorage(primaryStorage, fallbackStorage) {
 export function createPrimaryProjectStorage(primaryStorage, mirrorStorage) {
   return {
     async getProject(key) {
+      let primarySnapshot = null;
+      let mirrorSnapshot = null;
+      let primaryError = null;
+      let mirrorError = null;
+
       try {
-        return (await primaryStorage.getProject(key)) ?? (await mirrorStorage.getProject(key));
-      } catch {
-        return mirrorStorage.getProject(key);
+        primarySnapshot = await primaryStorage.getProject(key);
+      } catch (error) {
+        primaryError = error;
       }
+
+      try {
+        mirrorSnapshot = await mirrorStorage.getProject(key);
+      } catch (error) {
+        mirrorError = error;
+      }
+
+      if (primarySnapshot || mirrorSnapshot) {
+        return newestProjectSnapshot(primarySnapshot, mirrorSnapshot);
+      }
+
+      if (primaryError && mirrorError) throw mirrorError;
+      if (!primaryError && mirrorError) throw mirrorError;
+      return null;
     },
     async setProject(key, snapshot) {
       let primaryError = null;
@@ -479,11 +498,32 @@ function readableProjectName(projectId) {
 function mergeProjectLists(primaryProjects, fallbackProjects) {
   const projectsById = new Map();
   for (const project of [...fallbackProjects, ...primaryProjects]) {
-    if (project?.id) projectsById.set(project.id, project);
+    if (!project?.id) continue;
+    const current = projectsById.get(project.id);
+    if (!current || isProjectSummaryAtLeastAsNew(project, current)) {
+      projectsById.set(project.id, project);
+    }
   }
   return Array.from(projectsById.values()).sort((a, b) =>
     String(b.savedAt ?? '').localeCompare(String(a.savedAt ?? ''))
   );
+}
+
+function newestProjectSnapshot(primarySnapshot, mirrorSnapshot) {
+  if (!primarySnapshot) return mirrorSnapshot ?? null;
+  if (!mirrorSnapshot) return primarySnapshot;
+  return savedAtTime(mirrorSnapshot.savedAt) > savedAtTime(primarySnapshot.savedAt)
+    ? mirrorSnapshot
+    : primarySnapshot;
+}
+
+function isProjectSummaryAtLeastAsNew(candidate, current) {
+  return savedAtTime(candidate.savedAt) >= savedAtTime(current.savedAt);
+}
+
+function savedAtTime(value) {
+  const time = Date.parse(value ?? '');
+  return Number.isFinite(time) ? time : 0;
 }
 
 function uniqueAssetId(input) {

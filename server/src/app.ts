@@ -42,12 +42,16 @@ export type AppOptions = {
   fallbackAssetDir?: string;
   generatedAssetStorageDir?: string;
   projectStorageDir?: string;
+  requestBodyLimitBytes?: number;
   fetch?: typeof fetch;
 };
 
 export const createApp = async (options: AppOptions = {}) => {
   const config = loadConfig();
-  const app = Fastify({ logger: false });
+  const app = Fastify({
+    logger: false,
+    bodyLimit: options.requestBodyLimitBytes ?? config.requestBodyLimitBytes
+  });
   const assetGenerator = options.assetGenerator ?? createDefaultAssetGenerator();
   const objectEstimator = options.objectEstimator ?? createDefaultObjectEstimator();
   const commandParser = options.commandParser ?? createDefaultCommandParser();
