@@ -277,6 +277,39 @@
   flex-shrink: 0;
 }
 
+.compactInput {
+  width: 44px;
+  flex: 0 0 44px;
+}
+
+.editorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.selectInput {
+  flex: 1;
+  padding: 4px 6px;
+  border-radius: 3px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
 .meshInfoRow {
   display: flex;
   justify-content: space-between;

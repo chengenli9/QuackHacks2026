@@ -11,8 +11,15 @@ import type {
   FallbackAssetKey,
   SceneOperation
 } from "../schemas.js";
+import type { CommandParser, CommandResponse } from "../providers/CommandParser.js";
 
 type SceneObject = CommandRequest["sceneContext"]["objects"][number];
+
+export class RuleCommandParser implements CommandParser {
+  async parse(input: CommandRequest): Promise<CommandResponse> {
+    return buildCommandResponse(input);
+  }
+}
 
 export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
   const request = commandRequestSchema.parse(input);

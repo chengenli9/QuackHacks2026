@@ -1,3 +1,5 @@
+import { prepareEditableObjectMaterials } from './objectAppearance.js';
+
 const MIN_ENV_MAP_INTENSITY = 1.4;
 
 export function prepareImportedObjectVisuals(root) {
@@ -21,6 +23,8 @@ export function prepareImportedObjectVisuals(root) {
       material.needsUpdate = true;
     }
   });
+
+  prepareEditableObjectMaterials(root);
 }
 
 function materialsFor(material) {

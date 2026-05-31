@@ -47,6 +47,7 @@ function MenuDropdown({ label, items, open, onToggle, onAction }) {
               <button
                 key={itemLabel(item)}
                 className={`${styles.dropdownItem} ${item.action ? styles.actionable : ''}`}
+                disabled={!item.action}
                 onClick={() => {
                   if (item.action) {
                     onAction(item.action);

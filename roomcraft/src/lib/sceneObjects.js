@@ -1,6 +1,7 @@
-import { Box3, Vector3 } from 'three';
+import { Box3, Euler, Quaternion, Vector3 } from 'three';
 import { inferPhysicsProfile, isGenericSceneNodeLabel } from './physicsProfiles.js';
 import { prepareImportedObjectVisuals } from './importedVisuals.js';
+import { normalizeSceneObject } from './sceneState.js';
 
 const GENERIC_CONTAINER_NAMES = new Set(['', 'scene', 'root', 'gltfscene', 'gltf_scene']);
 
@@ -22,8 +23,10 @@ export function createSceneObjectRegistry(root, { sourceFileName = null, existin
     const id = uniqueId(slugify(label) || `geometry_${index}`, usedIds);
     const bounds = boundsFor(node);
     const meshStats = meshStatsFor(node);
+    const transform = transformFor(node);
 
     node.userData.roomcraftObjectId = id;
+    resetObjectRootTransform(node);
     prepareImportedObjectVisuals(node);
     node.traverse((child) => {
       if (child.isMesh) {
@@ -32,7 +35,7 @@ export function createSceneObjectRegistry(root, { sourceFileName = null, existin
       }
     });
 
-    return {
+    return normalizeSceneObject({
       id,
       label,
       nodeName: node.name || label,
@@ -43,8 +46,20 @@ export function createSceneObjectRegistry(root, { sourceFileName = null, existin
       triangleCount: meshStats.triangleCount,
       dimensions: bounds.dimensions,
       center: bounds.center,
+      transform,
       physics: inferPhysicsProfile({ label, dimensions: bounds.dimensions }),
-    };
+      appearance: {
+        baseColor: null,
+        roughness: 0.8,
+        metalness: 0.1,
+        textureDescription: '',
+        source: 'import',
+      },
+      source: {
+        type: 'import',
+        fileName: sourceFileName,
+      },
+    });
   });
 
   const warnings = [];
@@ -57,6 +72,34 @@ export function createSceneObjectRegistry(root, { sourceFileName = null, existin
   }
 
   return { sourceFileName, objects, warnings };
+}
+
+function transformFor(node) {
+  node.updateWorldMatrix?.(true, true);
+
+  const position = new Vector3();
+  const quaternion = new Quaternion();
+  const scale = new Vector3();
+  node.matrixWorld.decompose(position, quaternion, scale);
+  const rotation = new Euler().setFromQuaternion(quaternion, 'XYZ');
+
+  return {
+    position: cleanVector([position.x, position.y, position.z]),
+    rotation: cleanVector([rotation.x, rotation.y, rotation.z]),
+    scale: cleanVector([scale.x || 1, scale.y || 1, scale.z || 1]),
+  };
+}
+
+function resetObjectRootTransform(node) {
+  node.position.set(0, 0, 0);
+  node.rotation.set(0, 0, 0);
+  node.quaternion.identity();
+  node.scale.set(1, 1, 1);
+  node.updateMatrix();
+}
+
+function cleanVector(values) {
+  return values.map((value) => (Math.abs(value) < 1e-10 ? 0 : value));
 }
 
 export function findRenderableObjectRoots(root) {

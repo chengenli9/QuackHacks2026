@@ -4,7 +4,10 @@ import { ZodError } from "zod";
 import { HttpError, validationErrorResponse } from "./errors.js";
 import { loadConfig } from "./config.js";
 import type { AssetGenerator } from "./providers/AssetGenerator.js";
+import type { CommandParser } from "./providers/CommandParser.js";
 import type { ObjectPropertyEstimator } from "./providers/ObjectPropertyEstimator.js";
+import { GeminiCommandParser } from "./providers/GeminiCommandParser.js";
+import { GeminiObjectPropertyEstimator } from "./providers/GeminiObjectPropertyEstimator.js";
 import { LocalAssetProvider } from "./providers/LocalAssetProvider.js";
 import { MeshyProvider } from "./providers/MeshyProvider.js";
 import { OpenAIObjectPropertyEstimator } from "./providers/OpenAIObjectPropertyEstimator.js";
@@ -18,10 +21,12 @@ import { AssetGenerationService } from "./services/assetGenerationService.js";
 import { GeneratedAssetCache } from "./services/generatedAssetCache.js";
 import { LocalObjectPropertyEstimator } from "./services/localObjectPropertyEstimator.js";
 import { MeshyTaskStore } from "./services/meshyTaskStore.js";
+import { RuleCommandParser } from "./services/commandParser.js";
 
 export type AppOptions = {
   assetGenerator?: AssetGenerator;
   objectEstimator?: ObjectPropertyEstimator;
+  commandParser?: CommandParser;
   publicBaseUrl?: string;
 };
 
@@ -30,6 +35,7 @@ export const createApp = async (options: AppOptions = {}) => {
   const app = Fastify({ logger: false });
   const assetGenerator = options.assetGenerator ?? createDefaultAssetGenerator();
   const objectEstimator = options.objectEstimator ?? createDefaultObjectEstimator();
+  const commandParser = options.commandParser ?? createDefaultCommandParser();
   const localAssetProvider = new LocalAssetProvider(
     options.publicBaseUrl ?? config.publicBaseUrl
   );
@@ -68,7 +74,9 @@ export const createApp = async (options: AppOptions = {}) => {
     service: "quackhacks-backend"
   }));
 
-  await app.register(registerCommandRoutes);
+  await app.register(async (instance) =>
+    registerCommandRoutes(instance, commandParser)
+  );
   await app.register(async (instance) =>
     registerEstimateObjectRoutes(instance, objectEstimator)
   );
@@ -101,6 +109,14 @@ const createDefaultAssetGenerator = (): AssetGenerator => {
 const createDefaultObjectEstimator = (): ObjectPropertyEstimator => {
   const config = loadConfig();
 
+  if (config.geminiApiKey) {
+    return new GeminiObjectPropertyEstimator({
+      apiKey: config.geminiApiKey,
+      model: config.geminiModel,
+      baseUrl: config.geminiBaseUrl
+    });
+  }
+
   if (!config.openAiApiKey) {
     return new LocalObjectPropertyEstimator();
   }
@@ -109,5 +125,19 @@ const createDefaultObjectEstimator = (): ObjectPropertyEstimator => {
     apiKey: config.openAiApiKey,
     model: config.openAiModel,
     baseUrl: config.openAiBaseUrl
+  });
+};
+
+const createDefaultCommandParser = (): CommandParser => {
+  const config = loadConfig();
+
+  if (!config.geminiApiKey) {
+    return new RuleCommandParser();
+  }
+
+  return new GeminiCommandParser({
+    apiKey: config.geminiApiKey,
+    model: config.geminiModel,
+    baseUrl: config.geminiBaseUrl
   });
 };

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
+import { ArrowDown, MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import ThreeScene from './ThreeScene';
 import styles from './Viewport.module.css';
@@ -15,16 +15,28 @@ const TOOLS = [
 ];
 
 export default function Viewport() {
-  const { activeTool, setActiveTool, viewMode, setViewMode } = useStore();
+  const {
+    activeTool,
+    setActiveTool,
+    viewMode,
+    setViewMode,
+    perspective,
+    setPerspective,
+    overlaysEnabled,
+    toggleOverlays,
+    gravityEnabled,
+    setGravityEnabled,
+  } = useStore();
   const [camPos, setCamPos] = useState({ x: 5.0, y: 3.2, z: 5.0 });
   const [cameraTarget, setCameraTarget] = useState(null);
   const [inputVals, setInputVals] = useState({ x: '5.00', y: '3.20', z: '5.00' });
   const editingAxes = useRef(new Set());
   const [showPerspDrop, setShowPerspDrop] = useState(false);
-  const [perspective, setPerspective] = useState('Perspective');
   const frameRef = useRef(null);
+  const cameraTargetNonce = useRef(0);
 
   const handleCameraUpdate = useCallback((pos) => {
+    if (frameRef.current) cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
       setCamPos({ x: pos.x, y: pos.y, z: pos.z });
       setInputVals(prev => {
@@ -40,7 +52,13 @@ export default function Viewport() {
   function commitAxis(axis) {
     const val = parseFloat(inputVals[axis]);
     if (!isNaN(val)) {
-      setCameraTarget({ x: axis === 'x' ? val : camPos.x, y: axis === 'y' ? val : camPos.y, z: axis === 'z' ? val : camPos.z, _t: Date.now() });
+      cameraTargetNonce.current += 1;
+      setCameraTarget({
+        x: axis === 'x' ? val : camPos.x,
+        y: axis === 'y' ? val : camPos.y,
+        z: axis === 'z' ? val : camPos.z,
+        revision: cameraTargetNonce.current,
+      });
     } else {
       setInputVals(prev => ({ ...prev, [axis]: camPos[axis].toFixed(2) }));
     }
@@ -76,7 +94,7 @@ export default function Viewport() {
                     fontSize: 'var(--font-size-xs)', color: p === perspective ? 'var(--accent)' : 'var(--text-secondary)',
                     background: 'none', border: 'none', cursor: 'pointer',
                   }}
-                  onClick={() => { setPerspective(p); setShowPerspDrop(false); }}
+                  onClick={() => { setPerspective(p); setShowPerspDrop(false); setCameraTarget(null); }}
                 >
                   {p}
                 </button>
@@ -99,8 +117,18 @@ export default function Viewport() {
 
         <div className={styles.toolbarDivider} />
 
-        <button className={styles.toolbarBtn}>
+        <button
+          className={`${styles.toolbarBtn} ${overlaysEnabled ? styles.active : ''}`}
+          onClick={toggleOverlays}
+        >
           <Grid3x3 size={12} /> Overlays
+        </button>
+
+        <button
+          className={`${styles.toolbarBtn} ${gravityEnabled ? styles.active : ''}`}
+          onClick={() => setGravityEnabled(!gravityEnabled)}
+        >
+          <ArrowDown size={12} /> Gravity
         </button>
       </div>
 

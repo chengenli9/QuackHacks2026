@@ -10,21 +10,28 @@ test('posts object preview images to the backend estimate endpoint', async () =>
     requestBody = JSON.parse(init.body);
     return {
       ok: true,
-      json: async () => ({
-        objectId: 'geometry_0',
-        label: 'wooden chair',
-        category: 'furniture',
-        material: 'wood',
+    json: async () => ({
+      objectId: 'geometry_0',
+      label: 'wooden chair',
+      category: 'furniture',
+      material: 'wood',
         massKg: 7,
         restitution: 0.12,
         friction: 0.7,
         static: false,
         breakable: false,
-        collider: 'cuboid',
-        confidence: 0.87,
-        notes: 'Looks like a chair.',
-      }),
-    };
+      collider: 'cuboid',
+      confidence: 0.87,
+      notes: 'Looks like a chair.',
+      appearance: {
+        baseColor: '#8b5a2b',
+        roughness: 0.72,
+        metalness: 0,
+        textureDescription: 'warm wood grain',
+        source: 'vlm',
+      },
+    }),
+  };
   };
 
   const profile = await requestVisualPhysicsEstimate({
@@ -53,6 +60,8 @@ test('posts object preview images to the backend estimate endpoint', async () =>
     triangleCount: 64,
   });
   assert.equal(profile.label, 'wooden chair');
+  assert.equal(profile.appearance.baseColor, '#8b5a2b');
+  assert.equal(profile.appearance.textureDescription, 'warm wood grain');
   assert.equal(profile.source, 'vlm');
   assert.equal(profile.needsVisualEstimate, false);
 });

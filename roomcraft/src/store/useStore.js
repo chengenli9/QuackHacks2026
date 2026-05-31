@@ -1,4 +1,12 @@
 import { create } from 'zustand';
+import {
+  applySceneOperationToState,
+  mergeObjectEstimate,
+  normalizeSceneObject,
+  updateObjectAppearance,
+  updateObjectPhysics,
+  updateObjectTransform,
+} from '../lib/sceneState.js';
 
 const useStore = create((set) => ({
   // App navigation
@@ -6,16 +14,23 @@ const useStore = create((set) => ({
   setCurrentView: (view) => set({ currentView: view }),
 
   // Panel state
-  leftPanelTab: 'video',
-  chatSubTab: 'image',
+  leftPanelTab: 'import',
+  chatSubTab: 'prompt',
   setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
   setChatSubTab: (tab) => set({ chatSubTab: tab }),
 
   // Viewport
   activeTool: 'select',
-  viewMode: 'solid',
+  viewMode: 'material',
+  perspective: 'Perspective',
+  overlaysEnabled: true,
+  gravityEnabled: false,
+  exportRequestedAt: null,
   setActiveTool: (tool) => set({ activeTool: tool }),
   setViewMode: (mode) => set({ viewMode: mode }),
+  setPerspective: (perspective) => set({ perspective }),
+  toggleOverlays: () => set((state) => ({ overlaysEnabled: !state.overlaysEnabled })),
+  setGravityEnabled: (gravityEnabled) => set({ gravityEnabled }),
 
   // Hierarchy
   selectedObjectId: 'Room_Mesh',
@@ -39,7 +54,7 @@ const useStore = create((set) => ({
   requestGlbImport: () =>
     set((state) => ({
       glbImportRequestId: state.glbImportRequestId + 1,
-      leftPanelTab: 'video',
+      leftPanelTab: 'import',
     })),
   setGlbImportStatus: (status, error = null) =>
     set({ glbImportStatus: status, glbImportError: error }),
@@ -49,7 +64,7 @@ const useStore = create((set) => ({
   setImportedScene: ({ fileName, objects, warnings = [] }) =>
     set((state) => ({
       importedGlbFileName: fileName,
-      sceneObjects: objects,
+      sceneObjects: objects.map(normalizeSceneObject),
       glbImportStatus: 'ready',
       glbImportError: null,
       glbImportWarnings: warnings,
@@ -59,7 +74,7 @@ const useStore = create((set) => ({
   addImportedScene: ({ fileName, objects, warnings = [] }) =>
     set((state) => ({
       importedGlbFileName: fileName,
-      sceneObjects: [...state.sceneObjects, ...objects],
+      sceneObjects: [...state.sceneObjects, ...objects.map(normalizeSceneObject)],
       glbImportStatus: 'ready',
       glbImportError: null,
       glbImportWarnings: [...state.glbImportWarnings, ...warnings],
@@ -68,21 +83,26 @@ const useStore = create((set) => ({
     })),
   mergeSceneObjectEstimate: (objectId, estimate) =>
     set((state) => ({
-      sceneObjects: state.sceneObjects.map((object) =>
-        object.id === objectId
-          ? {
-              ...object,
-              label: estimate.label || object.label,
-              physics: {
-                ...object.physics,
-                ...estimate,
-                needsVisualEstimate: false,
-                source: 'vlm',
-              },
-            }
-          : object
-      ),
+      sceneObjects: mergeObjectEstimate(state.sceneObjects, objectId, estimate),
     })),
+  updateSceneObjectTransform: (objectId, patch) =>
+    set((state) => ({
+      sceneObjects: updateObjectTransform(state.sceneObjects, objectId, patch),
+    })),
+  setSceneObjectRuntimeTransform: (objectId, patch) =>
+    set((state) => ({
+      sceneObjects: updateObjectTransform(state.sceneObjects, objectId, patch, { runtime: true }),
+    })),
+  updateSceneObjectAppearance: (objectId, patch) =>
+    set((state) => ({
+      sceneObjects: updateObjectAppearance(state.sceneObjects, objectId, patch),
+    })),
+  updateSceneObjectPhysics: (objectId, patch) =>
+    set((state) => ({
+      sceneObjects: updateObjectPhysics(state.sceneObjects, objectId, patch),
+    })),
+  applySceneOperation: (operation) =>
+    set((state) => applySceneOperationToState(state, operation)),
   clearImportedScene: () =>
     set({
       importedGlbFileName: null,
@@ -94,18 +114,21 @@ const useStore = create((set) => ({
       selectedObjectId: 'Room_Mesh',
     }),
 
-  // Upload (mock)
-  uploadedVideoName: null,
-  uploadedVideoDuration: null,
-  setUploadedVideo: (name, duration) =>
-    set({ uploadedVideoName: name, uploadedVideoDuration: duration }),
+  // Generated assets
+  generatedTasks: [],
+  upsertGeneratedTask: (task) =>
+    set((state) => {
+      const existing = state.generatedTasks.some((item) => item.taskId === task.taskId);
+      return {
+        generatedTasks: existing
+          ? state.generatedTasks.map((item) => (item.taskId === task.taskId ? { ...item, ...task } : item))
+          : [...state.generatedTasks, task],
+      };
+    }),
 
-  // Chat (mock)
+  // Chat
   chatMessages: [
-    { id: 1, sender: 'ai', text: 'Upload an image or describe an asset to generate a 3D model.' },
-    { id: 2, sender: 'user', text: 'A wooden chair with a cushion.' },
-    { id: 3, sender: 'ai', text: 'Generating a wooden chair mesh... This may take a moment.', loading: false },
-    { id: 4, sender: 'ai', text: 'Asset ready - wooden_chair.glb added to your scene.' },
+    { id: 1, sender: 'ai', text: 'Import a GLB scene, then ask me to edit objects or add generated assets.' },
   ],
   addChatMessage: (msg) =>
     set((state) => ({ chatMessages: [...state.chatMessages, msg] })),

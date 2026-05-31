@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import useStore from '../../store/useStore';
 import styles from './RightPanel.module.css';
 
@@ -15,6 +14,8 @@ const OBJECT_DATA = {
 };
 
 const DEFAULT_DATA = { verts: '-', polys: '-', format: '-', color: '#888888' };
+const BODY_TYPES = ['Dynamic', 'Fixed'];
+const COLLIDERS = ['cuboid', 'ball', 'cylinder', 'convex_hull'];
 
 function formatNumber(value) {
   return Number.isFinite(value) ? value.toLocaleString() : '-';
@@ -24,19 +25,34 @@ function formatFixed(value) {
   return Number.isFinite(value) ? value.toFixed(2) : '0.00';
 }
 
-function XYZRow({ label, values }) {
+function parseNumber(value, fallback) {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function XYZRow({ label, values, onChange, disabled = false }) {
   return (
     <div className={styles.transformRow}>
       <span className={styles.transformLabel}>{label}</span>
       <div className={styles.xyzRow} style={{ flex: 1 }}>
         {['X', 'Y', 'Z'].map((axis, index) => (
           <div key={axis} style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 2 }}>
-            <span className={styles.xyzLabel} style={{ color: axis === 'X' ? '#e8524a' : axis === 'Y' ? '#6abf69' : '#4d9de0' }}>{axis}</span>
+            <span
+              className={styles.xyzLabel}
+              style={{ color: axis === 'X' ? '#e8524a' : axis === 'Y' ? '#6abf69' : '#4d9de0' }}
+            >
+              {axis}
+            </span>
             <input
               className={styles.xyzInput}
               value={formatFixed(values[index])}
-              readOnly
+              disabled={disabled}
               aria-label={`${label} ${axis}`}
+              onChange={(event) => {
+                const next = [...values];
+                next[index] = parseNumber(event.target.value, values[index]);
+                onChange(next);
+              }}
             />
           </div>
         ))}
@@ -45,44 +61,111 @@ function XYZRow({ label, values }) {
   );
 }
 
-function ImportedPhysicsSection({ object }) {
+function EditablePhysicsSection({ object, updateSceneObjectPhysics }) {
   const physics = object.physics;
 
   return (
     <div className={styles.propSection}>
       <div className={styles.propSectionHeader}>Physics</div>
-      <div className={styles.meshInfoRow}>
+
+      <div className={styles.editorRow}>
         <span className={styles.meshInfoKey}>Body</span>
-        <span className={styles.meshInfoVal}>{physics.static ? 'Fixed' : 'Dynamic'}</span>
+        <select
+          className={styles.selectInput}
+          value={physics.static ? 'Fixed' : 'Dynamic'}
+          onChange={(event) =>
+            updateSceneObjectPhysics(object.id, { static: event.target.value === 'Fixed' })
+          }
+        >
+          {BODY_TYPES.map((type) => <option key={type}>{type}</option>)}
+        </select>
       </div>
-      <div className={styles.meshInfoRow}>
+
+      <div className={styles.editorRow}>
         <span className={styles.meshInfoKey}>Collider</span>
-        <span className={styles.meshInfoVal}>{physics.collider}</span>
+        <select
+          className={styles.selectInput}
+          value={physics.collider}
+          onChange={(event) => updateSceneObjectPhysics(object.id, { collider: event.target.value })}
+        >
+          {COLLIDERS.map((type) => <option key={type}>{type}</option>)}
+        </select>
       </div>
-      <div className={styles.meshInfoRow}>
-        <span className={styles.meshInfoKey}>Mass</span>
-        <span className={styles.meshInfoVal}>{physics.massKg.toFixed(2)} kg</span>
-      </div>
-      <div className={styles.meshInfoRow}>
-        <span className={styles.meshInfoKey}>Friction</span>
-        <span className={styles.meshInfoVal}>{physics.friction.toFixed(2)}</span>
-      </div>
-      <div className={styles.meshInfoRow}>
-        <span className={styles.meshInfoKey}>Bounce</span>
-        <span className={styles.meshInfoVal}>{physics.restitution.toFixed(2)}</span>
-      </div>
+
+      <NumberSlider
+        label="Mass"
+        value={physics.massKg}
+        min={0.05}
+        max={50}
+        step={0.05}
+        onChange={(massKg) => updateSceneObjectPhysics(object.id, { massKg })}
+      />
+      <NumberSlider
+        label="Friction"
+        value={physics.friction}
+        min={0}
+        max={1}
+        step={0.01}
+        onChange={(friction) => updateSceneObjectPhysics(object.id, { friction })}
+      />
+      <NumberSlider
+        label="Bounce"
+        value={physics.restitution}
+        min={0}
+        max={1}
+        step={0.01}
+        onChange={(restitution) => updateSceneObjectPhysics(object.id, { restitution })}
+      />
+
+      <label className={styles.checkboxRow}>
+        <input
+          type="checkbox"
+          checked={Boolean(physics.breakable)}
+          onChange={(event) => updateSceneObjectPhysics(object.id, { breakable: event.target.checked })}
+        />
+        <span>Breakable</span>
+      </label>
+
       <div className={styles.meshInfoRow}>
         <span className={styles.meshInfoKey}>Source</span>
-        <span className={styles.meshInfoVal}>
-          {physics.needsVisualEstimate ? 'Needs VLM' : physics.source}
-        </span>
+        <span className={styles.meshInfoVal}>{physics.needsVisualEstimate ? 'Needs VLM' : physics.source}</span>
       </div>
     </div>
   );
 }
 
+function NumberSlider({ label, value, min, max, step, onChange, disabled = false }) {
+  return (
+    <div className={styles.sliderRow}>
+      <span className={styles.sliderLabel}>{label}</span>
+      <input
+        type="range"
+        className={styles.slider}
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(parseNumber(event.target.value, value))}
+      />
+      <input
+        className={`${styles.xyzInput} ${styles.compactInput}`}
+        value={formatFixed(value)}
+        disabled={disabled}
+        onChange={(event) => onChange(parseNumber(event.target.value, value))}
+      />
+    </div>
+  );
+}
+
 export default function PropertiesPanel() {
-  const { selectedObjectId, sceneObjects } = useStore();
+  const {
+    selectedObjectId,
+    sceneObjects,
+    updateSceneObjectTransform,
+    updateSceneObjectAppearance,
+    updateSceneObjectPhysics,
+  } = useStore();
   const selected = selectedObjectId || 'Room_Mesh';
   const selectedSceneObject = sceneObjects.find((object) => object.id === selected);
   const data = selectedSceneObject
@@ -90,18 +173,22 @@ export default function PropertiesPanel() {
         verts: formatNumber(selectedSceneObject.vertexCount),
         polys: formatNumber(selectedSceneObject.triangleCount),
         format: '.glb',
-        color: '#8a8a8a',
+        color: selectedSceneObject.appearance?.baseColor ?? '#8a8a8a',
       }
     : OBJECT_DATA[selected] || DEFAULT_DATA;
 
-  const [roughness, setRoughness] = useState(0.8);
-  const [metalness, setMetalness] = useState(0.1);
-  const [colorByObject, setColorByObject] = useState({});
-  const color = colorByObject[selected] ?? data.color;
-
-  const location = selectedSceneObject?.center ?? [0, 0, 0];
-  const rotation = [0, 0, 0];
-  const scale = selectedSceneObject?.dimensions ?? [1, 1, 1];
+  const transform = selectedSceneObject?.transform ?? {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  };
+  const appearance = selectedSceneObject?.appearance ?? {
+    baseColor: data.color,
+    roughness: 0.8,
+    metalness: 0.1,
+  };
+  const displayBaseColor = appearance.baseColor ?? data.color ?? '#8a8a8a';
+  const disabled = !selectedSceneObject;
 
   return (
     <div className={styles.propertiesPanel}>
@@ -115,9 +202,24 @@ export default function PropertiesPanel() {
       <div className={styles.transformScroll}>
         <div className={styles.propSection}>
           <div className={styles.propSectionHeader}>Transform</div>
-          <XYZRow label="Location" values={location} />
-          <XYZRow label="Rotation" values={rotation} />
-          <XYZRow label="Scale" values={scale} />
+          <XYZRow
+            label="Location"
+            values={transform.position}
+            disabled={disabled}
+            onChange={(position) => updateSceneObjectTransform(selectedSceneObject.id, { position })}
+          />
+          <XYZRow
+            label="Rotation"
+            values={transform.rotation}
+            disabled={disabled}
+            onChange={(rotation) => updateSceneObjectTransform(selectedSceneObject.id, { rotation })}
+          />
+          <XYZRow
+            label="Scale"
+            values={transform.scale}
+            disabled={disabled}
+            onChange={(scale) => updateSceneObjectTransform(selectedSceneObject.id, { scale })}
+          />
         </div>
       </div>
 
@@ -130,48 +232,42 @@ export default function PropertiesPanel() {
             <div className={styles.colorSwatch}>
               <input
                 type="color"
-                value={color}
+                value={displayBaseColor}
+                disabled={disabled}
                 onChange={(event) =>
-                  setColorByObject((state) => ({ ...state, [selected]: event.target.value }))
+                  updateSceneObjectAppearance(selectedSceneObject.id, { baseColor: event.target.value })
                 }
                 title="Pick base color"
               />
             </div>
             <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-              {color.toUpperCase()}
+              {displayBaseColor.toUpperCase()}
             </span>
           </div>
 
-          <div className={styles.sliderRow}>
-            <span className={styles.sliderLabel}>Roughness</span>
-            <input
-              type="range"
-              className={styles.slider}
-              min={0}
-              max={1}
-              step={0.01}
-              value={roughness}
-              onChange={(event) => setRoughness(parseFloat(event.target.value))}
-            />
-            <span className={styles.sliderVal}>{roughness.toFixed(1)}</span>
-          </div>
-
-          <div className={styles.sliderRow}>
-            <span className={styles.sliderLabel}>Metalness</span>
-            <input
-              type="range"
-              className={styles.slider}
-              min={0}
-              max={1}
-              step={0.01}
-              value={metalness}
-              onChange={(event) => setMetalness(parseFloat(event.target.value))}
-            />
-            <span className={styles.sliderVal}>{metalness.toFixed(1)}</span>
-          </div>
+          <NumberSlider
+            label="Roughness"
+            value={appearance.roughness}
+            min={0}
+            max={1}
+            step={0.01}
+            disabled={disabled}
+            onChange={(roughness) => selectedSceneObject && updateSceneObjectAppearance(selectedSceneObject.id, { roughness })}
+          />
+          <NumberSlider
+            label="Metalness"
+            value={appearance.metalness}
+            min={0}
+            max={1}
+            step={0.01}
+            disabled={disabled}
+            onChange={(metalness) => selectedSceneObject && updateSceneObjectAppearance(selectedSceneObject.id, { metalness })}
+          />
         </div>
 
-        {selectedSceneObject && <ImportedPhysicsSection object={selectedSceneObject} />}
+        {selectedSceneObject && (
+          <EditablePhysicsSection object={selectedSceneObject} updateSceneObjectPhysics={updateSceneObjectPhysics} />
+        )}
 
         {data.verts && (
           <div className={styles.propSection}>

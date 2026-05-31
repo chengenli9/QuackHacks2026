@@ -25,7 +25,7 @@ export default function LandingPage() {
           </div>
           <div className={styles.cardLabel}>Create New Project</div>
           <div className={styles.cardHint}>
-            Start from a video, images, or an empty scene
+            Start from a GLB scene, generated asset, or empty scene
           </div>
         </button>
 

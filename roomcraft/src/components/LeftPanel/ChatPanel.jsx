@@ -1,75 +1,240 @@
-import { useState, useRef, useEffect } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { ImagePlus, Send } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Send } from 'lucide-react';
 import useStore from '../../store/useStore';
+import {
+  requestFallbackAsset,
+  requestGeneratedAsset,
+  requestGeneratedAssetModel,
+  requestGeneratedAssetStatus,
+  requestSceneCommand,
+} from '../../lib/apiClient';
+import { fallbackPromptForAssetKey } from '../../lib/fallbackAssets';
+import { loadGlbIntoScene } from '../../lib/glbImport';
 import styles from './LeftPanel.module.css';
 
-const AI_REPLIES = [
-  'Interesting choice! Generating a 3D mesh for that asset now.',
-  'Processing your request — this usually takes about 10 seconds.',
-  "Got it! I'll add that to your scene once it's ready.",
-  'Acknowledged. Queueing asset generation with VGGT backend.',
-];
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function ChatPanel() {
-  const { chatSubTab, setChatSubTab, chatMessages, addChatMessage, updateLastMessage } = useStore();
+  const {
+    chatMessages,
+    addChatMessage,
+    updateLastMessage,
+    applySceneOperation,
+    upsertGeneratedTask,
+    addImportedScene,
+    setGlbImportStatus,
+    setVlmEstimateStatus,
+    mergeSceneObjectEstimate,
+    addGlbImportWarning,
+  } = useStore();
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const messageIdRef = useRef(10);
+
+  const nextMessageId = () => {
+    messageIdRef.current += 1;
+    return messageIdRef.current;
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = inputValue.trim();
     if (!text || isSending) return;
     setInputValue('');
     setIsSending(true);
 
-    const userMsg = { id: Date.now(), sender: 'user', text };
-    addChatMessage(userMsg);
+    addChatMessage({ id: nextMessageId(), sender: 'user', text });
+    addChatMessage({ id: nextMessageId(), sender: 'ai', text: 'Thinking...', typing: true });
 
-    const typingMsg = { id: Date.now() + 1, sender: 'ai', text: 'Thinking...', typing: true };
-    addChatMessage(typingMsg);
-
-    setTimeout(() => {
-      const reply = AI_REPLIES[Math.floor(Math.random() * AI_REPLIES.length)];
-      updateLastMessage({ id: Date.now() + 2, sender: 'ai', text: reply });
+    try {
+      const response = await requestSceneCommand({
+        message: text,
+        sceneObjects: useStore.getState().sceneObjects,
+      });
+      await handleOperation(response.operation);
+    } catch (error) {
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `I could not apply that command: ${errorMessage(error)}`,
+      });
+    } finally {
       setIsSending(false);
-    }, 1500);
+    }
   };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: { 'image/*': ['.jpg', '.jpeg', '.png', '.webp'] },
-    multiple: false,
-  });
+  const handleOperation = async (operation) => {
+    if (operation.action === 'add_generated_object') {
+      await handleGeneratedAssetOperation(operation);
+      return;
+    }
+
+    if (operation.action === 'add_local_object') {
+      await handleLocalAssetOperation(operation);
+      return;
+    }
+
+    applySceneOperation(operation);
+    updateLastMessage({
+      id: nextMessageId(),
+      sender: 'ai',
+      text: labelForAppliedOperation(operation),
+    });
+  };
+
+  const handleGeneratedAssetOperation = async (operation) => {
+    try {
+      const task = await requestGeneratedAsset({ prompt: operation.prompt });
+      upsertGeneratedTask({
+        ...task,
+        prompt: operation.prompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+      });
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `Started Meshy generation for "${operation.prompt}".`,
+      });
+
+      const status = await pollGeneratedAsset(task.taskId, operation);
+      if (status.status !== 'succeeded') {
+        upsertGeneratedTask({
+          ...task,
+          ...status,
+          prompt: operation.prompt,
+          placement: operation.placement,
+          fallbackAssetKey: operation.fallbackAssetKey,
+        });
+        addChatMessage({
+          id: nextMessageId(),
+          sender: 'ai',
+          text: operation.fallbackAssetKey
+            ? 'Generation did not finish. Use the fallback asset button in Import when you want the deterministic local asset.'
+            : 'Generation did not finish and no fallback asset is available for this prompt.',
+        });
+        return;
+      }
+
+      const asset = await requestGeneratedAssetModel({ taskId: task.taskId });
+      upsertGeneratedTask({
+        ...task,
+        ...status,
+        ...asset,
+        prompt: operation.prompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+      });
+
+      await loadGlbIntoScene({
+        sourceUrl: asset.glbUrl,
+        fileName: `${asset.id}.glb`,
+        sceneObjects: useStore.getState().sceneObjects,
+        addImportedScene,
+        setGlbImportStatus,
+        setVlmEstimateStatus,
+        mergeSceneObjectEstimate,
+        addGlbImportWarning,
+        sourcePrompt: asset.sourcePrompt,
+        placement: operation.placement,
+      });
+
+      addChatMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `Added "${asset.sourcePrompt}" to the scene.`,
+      });
+    } catch (error) {
+      upsertGeneratedTask({
+        taskId: `failed-${nextMessageId()}`,
+        prompt: operation.prompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'failed',
+        error: errorMessage(error),
+      });
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: operation.fallbackAssetKey
+          ? `Generation failed: ${errorMessage(error)}. A fallback asset is available in Import.`
+          : `Generation failed: ${errorMessage(error)}.`,
+      });
+    }
+  };
+
+  const handleLocalAssetOperation = async (operation) => {
+    const sourcePrompt = fallbackPromptForAssetKey(operation.fallbackAssetKey);
+    const taskId = `local-${nextMessageId()}`;
+
+    try {
+      upsertGeneratedTask({
+        taskId,
+        provider: 'local',
+        prompt: sourcePrompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'loading-fallback',
+      });
+      const asset = await requestFallbackAsset({
+        fallbackAssetKey: operation.fallbackAssetKey,
+        sourcePrompt,
+      });
+      upsertGeneratedTask({
+        taskId,
+        ...asset,
+        prompt: sourcePrompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'fallback-ready',
+      });
+
+      await loadGlbIntoScene({
+        sourceUrl: asset.glbUrl,
+        fileName: `${asset.id}.glb`,
+        sceneObjects: useStore.getState().sceneObjects,
+        addImportedScene,
+        setGlbImportStatus,
+        setVlmEstimateStatus,
+        mergeSceneObjectEstimate,
+        addGlbImportWarning,
+        sourcePrompt: asset.sourcePrompt,
+        placement: operation.placement,
+      });
+
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `Added "${asset.sourcePrompt}" to the scene.`,
+      });
+    } catch (error) {
+      upsertGeneratedTask({
+        taskId,
+        provider: 'local',
+        prompt: sourcePrompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'fallback-error',
+        error: errorMessage(error),
+      });
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `Fallback import failed: ${errorMessage(error)}.`,
+      });
+    }
+  };
 
   return (
     <div className={styles.chatPanel}>
-      <div className={styles.subTabToggle}>
-        <button
-          className={`${styles.subTab} ${chatSubTab === 'image' ? styles.active : ''}`}
-          onClick={() => setChatSubTab('image')}
-        >
-          Image Upload
-        </button>
-        <button
-          className={`${styles.subTab} ${chatSubTab === 'prompt' ? styles.active : ''}`}
-          onClick={() => setChatSubTab('prompt')}
-        >
-          Text Prompt
-        </button>
-      </div>
-
-      {chatSubTab === 'image' && (
-        <div {...getRootProps()} className={`${styles.imageDropzone} ${isDragActive ? styles.dragOver : ''}`}>
-          <input {...getInputProps()} />
-          <ImagePlus size={18} color="var(--text-muted)" />
-          <span className={styles.imageDropzoneText}>Drop image here<br />(jpg / png)</span>
-        </div>
-      )}
-
       <div className={styles.chatMessages}>
         {chatMessages.map((msg) => (
           <div
@@ -88,16 +253,56 @@ export default function ChatPanel() {
       <div className={styles.chatInputRow}>
         <input
           className={styles.chatInput}
-          placeholder="Describe an asset..."
+          placeholder="Edit scene or generate an asset..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          onKeyDown={(e) => e.key === 'Enter' && void handleSend()}
           disabled={isSending}
         />
-        <button className={styles.sendBtn} onClick={handleSend} disabled={isSending || !inputValue.trim()}>
+        <button className={styles.sendBtn} onClick={() => void handleSend()} disabled={isSending || !inputValue.trim()}>
           <Send size={12} />
         </button>
       </div>
     </div>
   );
+}
+
+async function pollGeneratedAsset(taskId, operation) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const status = await requestGeneratedAssetStatus({ taskId });
+    useStore.getState().upsertGeneratedTask({
+      taskId,
+      prompt: operation.prompt,
+      placement: operation.placement,
+      fallbackAssetKey: operation.fallbackAssetKey,
+      ...status,
+    });
+    if (status.status === 'succeeded' || status.status === 'failed') return status;
+    await wait(1500);
+  }
+
+  return { taskId, status: 'failed', error: 'Timed out waiting for generated asset.' };
+}
+
+function labelForAppliedOperation(operation) {
+  switch (operation.action) {
+    case 'toggle_gravity':
+      return operation.enabled ? 'Gravity is on.' : 'Gravity is off.';
+    case 'update_object_physics':
+      return 'Updated object physics.';
+    case 'move_object':
+      return 'Moved the selected object.';
+    case 'rotate_object':
+      return 'Rotated the selected object.';
+    case 'scale_object':
+      return 'Scaled the selected object.';
+    case 'remove_object':
+      return 'Removed the object.';
+    case 'relabel_object':
+      return 'Renamed the object.';
+    case 'export_scene':
+      return 'Export requested.';
+    default:
+      return 'Applied scene change.';
+  }
 }

@@ -155,12 +155,22 @@ export const materialSchema = z.enum([
 
 export const colliderSchema = z.enum(["ball", "cuboid", "cylinder", "convex_hull"]);
 
+export const appearanceProfileSchema = z.object({
+  baseColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  roughness: z.number().min(0).max(1),
+  metalness: z.number().min(0).max(1),
+  textureDescription: z.string().optional(),
+  source: z.enum(["vlm", "local", "editor", "import", "generated", "default"]).optional()
+});
+
 export const estimateObjectRequestSchema = z.object({
   objectId: z.string().min(1),
   label: z.string().trim().min(1).optional(),
   sourcePrompt: z.string().trim().min(1).optional(),
   dimensions: vector3Schema.optional(),
-  meshMetadata: z.record(z.string(), z.unknown()).optional()
+  meshMetadata: z.record(z.string(), z.unknown()).optional(),
+  imageBase64: z.string().min(1).optional(),
+  imageMimeType: z.string().min(1).optional()
 });
 
 export const objectPhysicsProfileSchema = z.object({
@@ -175,7 +185,8 @@ export const objectPhysicsProfileSchema = z.object({
   breakable: z.boolean(),
   collider: colliderSchema,
   confidence: z.number().min(0).max(1),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  appearance: appearanceProfileSchema.optional()
 });
 
 export type TextAssetGenerationInput = z.infer<typeof textAssetGenerationInputSchema>;
@@ -189,3 +200,4 @@ export type SceneOperation = z.infer<typeof sceneOperationSchema>;
 export type CommandRequest = z.infer<typeof commandRequestSchema>;
 export type ObjectEstimateInput = z.infer<typeof estimateObjectRequestSchema>;
 export type ObjectPhysicsProfile = z.infer<typeof objectPhysicsProfileSchema>;
+export type ObjectAppearanceProfile = z.infer<typeof appearanceProfileSchema>;

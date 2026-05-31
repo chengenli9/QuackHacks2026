@@ -65,3 +65,25 @@ test('warns when a GLB only exposes one merged renderable object', () => {
   assert.equal(registry.objects.length, 1);
   assert.match(registry.warnings[0], /single renderable object/i);
 });
+
+test('preserves world transform once and resets imported object roots for editor control', () => {
+  const root = new Object3D();
+  root.name = 'Root';
+  root.scale.set(10, 10, 10);
+  const wrapper = new Object3D();
+  wrapper.name = 'Scene';
+  const importedMesh = mesh('geometry_0');
+  importedMesh.position.set(1, 2, 3);
+  importedMesh.scale.set(0.5, 0.5, 0.5);
+  wrapper.add(importedMesh);
+  root.add(wrapper);
+
+  const registry = createSceneObjectRegistry(root);
+  const [object] = registry.objects;
+
+  assert.deepEqual(object.transform.position, [10, 20, 30]);
+  assert.deepEqual(object.transform.scale, [5, 5, 5]);
+  assert.deepEqual(object.dimensions, [5, 5, 5]);
+  assert.deepEqual(object.object3d.position.toArray(), [0, 0, 0]);
+  assert.deepEqual(object.object3d.scale.toArray(), [1, 1, 1]);
+});

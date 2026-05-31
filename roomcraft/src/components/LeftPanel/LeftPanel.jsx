@@ -1,5 +1,5 @@
 import useStore from '../../store/useStore';
-import VideoUploadPanel from './VideoUploadPanel';
+import ImportPanel from './ImportPanel';
 import ChatPanel from './ChatPanel';
 import styles from './LeftPanel.module.css';
 
@@ -10,10 +10,10 @@ export default function LeftPanel() {
     <aside className={styles.leftPanel}>
       <div className={styles.tabToggle}>
         <button
-          className={`${styles.tab} ${leftPanelTab === 'video' ? styles.active : ''}`}
-          onClick={() => setLeftPanelTab('video')}
+          className={`${styles.tab} ${leftPanelTab === 'import' ? styles.active : ''}`}
+          onClick={() => setLeftPanelTab('import')}
         >
-          Video
+          Import
         </button>
         <button
           className={`${styles.tab} ${leftPanelTab === 'chat' ? styles.active : ''}`}
@@ -24,7 +24,7 @@ export default function LeftPanel() {
       </div>
 
       <div key={leftPanelTab} className={styles.panelContent}>
-        {leftPanelTab === 'video' ? <VideoUploadPanel /> : <ChatPanel />}
+        {leftPanelTab === 'import' ? <ImportPanel /> : <ChatPanel />}
       </div>
     </aside>
   );

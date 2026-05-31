@@ -2,6 +2,7 @@ export async function requestVisualPhysicsEstimate({
   apiBaseUrl,
   fetchImpl = globalThis.fetch,
   object,
+  sourcePrompt,
   imageBase64,
   imageMimeType,
 }) {
@@ -15,6 +16,7 @@ export async function requestVisualPhysicsEstimate({
     body: JSON.stringify({
       objectId: object.id,
       label: object.label,
+      ...(sourcePrompt ? { sourcePrompt } : {}),
       dimensions: object.dimensions,
       meshMetadata: {
         meshCount: object.meshCount,

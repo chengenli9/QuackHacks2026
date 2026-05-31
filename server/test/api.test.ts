@@ -8,6 +8,7 @@ import type {
   GeneratedAsset,
   TextAssetGenerationInput
 } from "../src/providers/AssetGenerator.js";
+import type { CommandParser } from "../src/providers/CommandParser.js";
 
 class FakeAssetGenerator implements AssetGenerator {
   public readonly generateFromText = vi.fn(
@@ -37,6 +38,17 @@ class FakeAssetGenerator implements AssetGenerator {
       metadata: { providerTaskId: taskId }
     })
   );
+}
+
+class FakeCommandParser implements CommandParser {
+  async parse() {
+    return {
+      operation: {
+        action: "toggle_gravity" as const,
+        enabled: true
+      }
+    };
+  }
 }
 
 describe("backend API", () => {
@@ -102,6 +114,24 @@ describe("backend API", () => {
         target: "duck_01",
         changes: { restitution: 0.85 }
       }
+    });
+  });
+
+  it("routes chat commands through the configured command parser provider", async () => {
+    app = await createApp({
+      assetGenerator: new FakeAssetGenerator(),
+      commandParser: new FakeCommandParser()
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/command",
+      payload: { message: "please handle this", sceneContext: { objects: [] } }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      operation: { action: "toggle_gravity", enabled: true }
     });
   });
 

@@ -96,6 +96,16 @@
   color: var(--text-secondary);
 }
 
+.dropdownItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.dropdownItem:disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
 .dropdownDivider {
   height: 1px;
   background: var(--border-subtle);

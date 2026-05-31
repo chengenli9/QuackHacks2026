@@ -11,7 +11,14 @@ cp .env.example .env
 
 Set `MESHY_API_KEY` in `.env` to enable live Meshy generation. Without a key, the server still starts and returns a clear `503` for live generation routes.
 
-Set `OPENAI_API_KEY` to use the OpenAI object-property estimator. Without a key, `/api/estimate-object` uses deterministic local rules.
+Set `GEMINI_API_KEY` to use Gemini for chat command parsing and object-property VLM estimation. Without a Gemini key, chat uses deterministic local parsing and `/api/estimate-object` falls back to local rules. `OPENAI_API_KEY` is still supported as a secondary object estimator when Gemini is not configured.
+
+Put the Gemini key in `server/.env`:
+
+```bash
+GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-3.5-flash
+```
 
 ## Scripts
 
