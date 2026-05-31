@@ -1,58 +1,41 @@
 import { useState } from 'react';
-import { Box, Camera, ChevronRight, Eye, Globe, Lightbulb, Package } from 'lucide-react';
+import { Camera, ChevronRight, Eye, EyeOff, Globe, Lightbulb, Package, Trash2 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import styles from './RightPanel.module.css';
 
-const STATIC_TREE = [
+const STATIC_LIGHTS_CAMERA = [
   {
-    id: 'Scene',
-    label: 'Scene',
-    icon: Globe,
+    id: 'Lights',
+    label: 'Lights',
+    icon: Lightbulb,
+    isStatic: true,
     children: [
-      {
-        id: 'Room_Mesh',
-        label: 'Room_Mesh',
-        icon: Box,
-        children: [
-          { id: 'Floor', label: 'Floor', icon: Box },
-          { id: 'Walls', label: 'Walls', icon: Box },
-          { id: 'Ceiling', label: 'Ceiling', icon: Box },
-        ],
-      },
-      { id: 'ChaoMan', label: 'ChaoMan', icon: Package },
-      {
-        id: 'Lights',
-        label: 'Lights',
-        icon: Lightbulb,
-        children: [
-          { id: 'Ambient', label: 'Ambient', icon: Lightbulb },
-          { id: 'Sun', label: 'Sun', icon: Lightbulb },
-        ],
-      },
-      { id: 'Camera', label: 'Camera', icon: Camera },
+      { id: 'Ambient', label: 'Ambient', icon: Lightbulb, isStatic: true },
+      { id: 'Sun', label: 'Sun', icon: Lightbulb, isStatic: true },
     ],
   },
+  { id: 'Camera', label: 'Camera', icon: Camera, isStatic: true },
 ];
 
 function buildTree(sceneObjects) {
-  if (!sceneObjects.length) return STATIC_TREE;
-
-  const importedNode = {
-    id: 'Imported_GLB',
-    label: 'Imported GLB',
-    icon: Box,
-    children: sceneObjects.map((object) => ({
-      id: object.id,
-      label: object.label,
-      icon: Box,
-    })),
-  };
-
-  return STATIC_TREE.map((node) =>
-    node.id === 'Scene'
-      ? { ...node, children: [node.children[0], importedNode, ...node.children.slice(1)] }
-      : node
-  );
+  return [
+    {
+      id: 'Scene',
+      label: 'Scene',
+      icon: Globe,
+      isStatic: true,
+      children: [
+        ...sceneObjects.map((object) => ({
+          id: object.id,
+          label: object.label,
+          icon: Package,
+          isStatic: false,
+          visible: object.visible !== false,
+        })),
+        ...STATIC_LIGHTS_CAMERA,
+      ],
+    },
+  ];
 }
 
 function nodeMatchesSearch(node, searchQuery) {
@@ -65,18 +48,38 @@ function nodeMatchesSearch(node, searchQuery) {
 }
 
 function TreeNode({ node, depth = 0, searchQuery }) {
-  const { selectedObjectId, setSelectedObject, expandedNodes, toggleNode } = useStore();
+  const { selectedObjectId, setSelectedObject, expandedNodes, toggleNode,
+    toggleSceneObjectVisibility, deleteSceneObject } = useStore();
+  // For imported objects, read visible state live from the store so it stays reactive
+  const liveVisible = useStore((state) => {
+    if (node.isStatic) return true;
+    const obj = state.sceneObjects.find((o) => o.id === node.id);
+    return obj ? obj.visible !== false : true;
+  });
   const isExpanded = expandedNodes.includes(node.id);
   const isSelected = selectedObjectId === node.id;
   const hasChildren = node.children?.length > 0;
   const Icon = node.icon;
+  const isVisible = node.isStatic ? true : liveVisible;
 
   if (!nodeMatchesSearch(node, searchQuery)) return null;
+
+  const handleVisibilityToggle = (event) => {
+    event.stopPropagation();
+    toggleSceneObjectVisibility(node.id);
+  };
+
+  const handleDelete = (event) => {
+    event.stopPropagation();
+    if (window.confirm(`Delete "${node.label}"? This cannot be undone.`)) {
+      deleteSceneObject(node.id);
+    }
+  };
 
   return (
     <div>
       <div
-        className={`${styles.treeNode} ${isSelected ? styles.selected : ''}`}
+        className={`${styles.treeNode} ${isSelected ? styles.selected : ''} ${!isVisible ? styles.hiddenNode : ''}`}
         style={{ paddingLeft: `${8 + depth * 14}px` }}
         onClick={() => setSelectedObject(node.id)}
       >
@@ -97,9 +100,25 @@ function TreeNode({ node, depth = 0, searchQuery }) {
           <Icon size={12} />
         </span>
         <span className={styles.nodeName}>{node.label}</span>
-        <button className={styles.visibilityBtn} onClick={(event) => event.stopPropagation()}>
-          <Eye size={11} />
-        </button>
+
+        {!node.isStatic && (
+          <>
+            <button
+              className={`${styles.visibilityBtn} ${!isVisible ? styles.visibilityBtnActive : ''}`}
+              title={isVisible ? 'Hide' : 'Show'}
+              onClick={handleVisibilityToggle}
+            >
+              {isVisible ? <Eye size={11} /> : <EyeOff size={11} />}
+            </button>
+            <button
+              className={styles.deleteBtn}
+              title="Delete"
+              onClick={handleDelete}
+            >
+              <Trash2 size={11} />
+            </button>
+          </>
+        )}
       </div>
 
       {hasChildren && isExpanded && (
