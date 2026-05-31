@@ -1,6 +1,24 @@
-import { useState, useCallback, useRef } from 'react';
-import { ArrowDown, Box, Layers, MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import {
+  ArrowDown,
+  Box,
+  Layers,
+  MousePointer2,
+  Move,
+  RotateCcw,
+  Maximize2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Grid3x3,
+  Info,
+  ScanLine,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import useStore from '../../store/useStore';
+import { buildShowtimeSteps } from '../../lib/showtimeDirector';
+import { PHYSICS_XRAY_LEGEND } from '../../lib/physicsXray';
 import ThreeScene from './ThreeScene';
 import styles from './Viewport.module.css';
 
@@ -24,6 +42,10 @@ export default function Viewport() {
     setPerspective,
     overlaysEnabled,
     toggleOverlays,
+    objectLabelsEnabled,
+    setObjectLabelsEnabled,
+    physicsXrayEnabled,
+    setPhysicsXrayEnabled,
     gravityEnabled,
     setGravityEnabled,
     collisionsEnabled,
@@ -34,6 +56,13 @@ export default function Viewport() {
     backgroundGallery,
     selectSceneBackground,
     sourceImageUrl,
+    sceneObjects,
+    generatedTasks,
+    showtimeEnabled,
+    showtimeStepIndex,
+    startShowtime,
+    stopShowtime,
+    advanceShowtime,
   } = useStore();
   const [camPos, setCamPos] = useState({ x: 5.0, y: 3.2, z: 5.0 });
   const [cameraTarget, setCameraTarget] = useState(null);
@@ -42,6 +71,12 @@ export default function Viewport() {
   const [showPerspDrop, setShowPerspDrop] = useState(false);
   const frameRef = useRef(null);
   const cameraTargetNonce = useRef(0);
+  const showtimeSteps = useMemo(
+    () => buildShowtimeSteps({ sceneObjects, generatedTasks }),
+    [sceneObjects, generatedTasks]
+  );
+  const activeShowtimeIndex = Math.min(showtimeStepIndex, Math.max(showtimeSteps.length - 1, 0));
+  const activeShowtimeStep = showtimeSteps[activeShowtimeIndex] ?? null;
 
   const handleCameraUpdate = useCallback((pos) => {
     if (frameRef.current) cancelAnimationFrame(frameRef.current);
@@ -139,6 +174,22 @@ export default function Viewport() {
         </button>
 
         <button
+          className={`${styles.toolbarBtn} ${objectLabelsEnabled ? styles.active : ''}`}
+          onClick={() => setObjectLabelsEnabled(!objectLabelsEnabled)}
+          aria-pressed={objectLabelsEnabled}
+        >
+          <Info size={12} /> AI Labels
+        </button>
+
+        <button
+          className={`${styles.toolbarBtn} ${physicsXrayEnabled ? styles.active : ''}`}
+          onClick={() => setPhysicsXrayEnabled(!physicsXrayEnabled)}
+          aria-pressed={physicsXrayEnabled}
+        >
+          <ScanLine size={12} /> Physics X-Ray
+        </button>
+
+        <button
           className={`${styles.toolbarBtn} ${gravityEnabled ? styles.active : ''}`}
           onClick={() => setGravityEnabled(!gravityEnabled)}
         >
@@ -157,6 +208,16 @@ export default function Viewport() {
           onClick={() => setFloorEnabled(!floorEnabled)}
         >
           <Layers size={12} /> Floor
+        </button>
+
+        <div className={styles.toolbarDivider} />
+
+        <button
+          className={`${styles.toolbarBtn} ${showtimeEnabled ? styles.active : ''}`}
+          onClick={() => (showtimeEnabled ? stopShowtime() : startShowtime())}
+          aria-pressed={showtimeEnabled}
+        >
+          <Sparkles size={12} /> Showtime
         </button>
       </div>
 
@@ -214,6 +275,77 @@ export default function Viewport() {
           ))}
         </div>
       )}
+
+      {physicsXrayEnabled && (
+        <div className={styles.physicsXrayLegend} aria-label="Physics x-ray legend">
+          <strong>Physics X-Ray</strong>
+          {PHYSICS_XRAY_LEGEND.map((entry) => (
+            <span key={entry.key}>
+              <i style={{ background: entry.color }} />
+              {entry.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {showtimeEnabled && activeShowtimeStep && (
+        <ShowtimeOverlay
+          step={activeShowtimeStep}
+          index={activeShowtimeIndex}
+          count={showtimeSteps.length}
+          onPrevious={() => advanceShowtime(-1)}
+          onNext={() => advanceShowtime(1)}
+          onStop={stopShowtime}
+        />
+      )}
     </div>
+  );
+}
+
+function ShowtimeOverlay({ step, index, count, onPrevious, onNext, onStop }) {
+  const progress = count > 0 ? ((index + 1) / count) * 100 : 0;
+  const facts = step.facts?.slice(0, 4) ?? [];
+
+  return (
+    <section className={styles.showtimeOverlay} aria-live="polite">
+      <div className={styles.showtimeHeader}>
+        <div className={styles.showtimeKicker}>
+          <Sparkles size={14} />
+          <span>Showtime</span>
+          <span className={styles.showtimeCount}>{index + 1}/{count}</span>
+        </div>
+        <button className={styles.showtimeIconBtn} onClick={onStop} title="Exit showtime">
+          <X size={14} />
+        </button>
+      </div>
+
+      <div className={styles.showtimeProgress} aria-hidden="true">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+
+      <h2>{step.title}</h2>
+      <p>{step.narrative}</p>
+
+      {step.objectId && (
+        <div className={styles.showtimeFocus}>Focused object: {step.title}</div>
+      )}
+
+      {facts.length > 0 && (
+        <ul className={styles.showtimeFacts}>
+          {facts.map((fact, factIndex) => (
+            <li key={`${factIndex}-${fact}`}>{fact}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className={styles.showtimeActions}>
+        <button onClick={onPrevious}>
+          <ChevronLeft size={14} /> Prev
+        </button>
+        <button onClick={onNext}>
+          Next <ChevronRight size={14} />
+        </button>
+      </div>
+    </section>
   );
 }

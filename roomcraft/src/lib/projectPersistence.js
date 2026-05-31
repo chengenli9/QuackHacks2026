@@ -14,6 +14,8 @@ const PROJECT_FIELDS = [
   'viewMode',
   'perspective',
   'overlaysEnabled',
+  'objectLabelsEnabled',
+  'physicsXrayEnabled',
   'gravityEnabled',
   'collisionsEnabled',
   'floorEnabled',
@@ -33,7 +35,6 @@ const PROJECT_FIELDS = [
   'sceneObjects',
   'assetSources',
   'generatedTasks',
-  'highlightedObjectId',
   'sceneBackground',
   'backgroundGallery',
   'demoSceneUrl',
@@ -43,12 +44,15 @@ const PROJECT_FIELDS = [
 
 export function serializeProjectState(state) {
   const project = {};
+  const serializableState = state.showtimeEnabled && state.showtimeReturnState
+    ? { ...state, ...state.showtimeReturnState }
+    : state;
 
   for (const field of PROJECT_FIELDS) {
     if (field === 'sceneObjects') {
-      project.sceneObjects = (state.sceneObjects ?? []).map(stripRuntimeObject);
+      project.sceneObjects = (serializableState.sceneObjects ?? []).map(stripRuntimeObject);
     } else {
-      project[field] = cloneJson(state[field]);
+      project[field] = cloneJson(serializableState[field]);
     }
   }
 
@@ -77,14 +81,23 @@ export function hydrateProjectSnapshot(snapshot) {
     ...cloneJson(project),
     currentView: 'editor',
     floorEnabled: project.floorEnabled ?? true,
+    objectLabelsEnabled: project.objectLabelsEnabled ?? false,
+    physicsXrayEnabled: project.physicsXrayEnabled ?? false,
     backgroundGallery: cloneJson(project.backgroundGallery ?? []),
     sceneObjects,
+    selectedObjectId: selectableProjectObjectId(project.selectedObjectId, sceneObjects),
     assetSources: cloneJson(project.assetSources ?? []),
     savedProjectUpdatedAt: snapshot.savedAt,
     restoredProjectNotice: sceneObjects.length
       ? 'Project metadata restored. Reloading saved GLB sources...'
       : 'Project restored.',
   };
+}
+
+function selectableProjectObjectId(objectId, sceneObjects) {
+  return sceneObjects.some((object) => object.id === objectId)
+    ? objectId
+    : sceneObjects[0]?.id ?? 'Room_Mesh';
 }
 
 export async function writeSavedProject(snapshot, storage = browserProjectStorage()) {

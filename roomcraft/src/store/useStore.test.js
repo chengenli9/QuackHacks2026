@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemoryProjectStorage } from '../lib/projectPersistence.js';
+import { buildShowtimeSteps } from '../lib/showtimeDirector.js';
 import useStore from './useStore.js';
 
 test('requestGlbImport switches to the import tab and increments the import request token', () => {
@@ -173,6 +174,121 @@ test('background gallery dedupes repeated generated backgrounds and keeps a boun
   assert.equal(state.backgroundGallery.length, 12);
   assert.equal(state.backgroundGallery.filter((background) => background.id === 'background_5').length, 1);
   assert.equal(state.sceneBackground.id, 'background_5');
+});
+
+test('showtime mode selects and highlights the focused demo object', () => {
+  useStore.setState(useStore.getInitialState(), true);
+  useStore.setState({
+    currentView: 'editor',
+    activeTool: 'move',
+    viewMode: 'wireframe',
+    perspective: 'Top',
+    overlaysEnabled: false,
+    objectLabelsEnabled: false,
+    physicsXrayEnabled: false,
+    collisionsEnabled: false,
+    floorEnabled: false,
+    sceneObjects: [
+      {
+        id: 'duck_01',
+        label: 'rubber duck',
+        physics: { category: 'toy', material: 'rubber', massKg: 0.2, confidence: 0.9 },
+      },
+    ],
+  });
+
+  useStore.getState().startShowtime();
+
+  let state = useStore.getState();
+  assert.equal(state.showtimeEnabled, true);
+  assert.equal(state.showtimeStepIndex, 0);
+  assert.equal(state.activeTool, 'select');
+  assert.equal(state.viewMode, 'material');
+  assert.equal(state.perspective, 'Perspective');
+  assert.equal(state.overlaysEnabled, true);
+  assert.equal(state.objectLabelsEnabled, true);
+  assert.equal(state.physicsXrayEnabled, true);
+  assert.equal(state.collisionsEnabled, true);
+  assert.equal(state.floorEnabled, true);
+
+  useStore.getState().advanceShowtime();
+  state = useStore.getState();
+  assert.equal(state.showtimeStepIndex, 1);
+  assert.equal(state.selectedObjectId, 'duck_01');
+  assert.equal(state.highlightedObjectId, 'duck_01');
+
+  useStore.getState().stopShowtime();
+  state = useStore.getState();
+  assert.equal(state.showtimeEnabled, false);
+  assert.equal(state.highlightedObjectId, null);
+  assert.equal(state.activeTool, 'move');
+  assert.equal(state.viewMode, 'wireframe');
+  assert.equal(state.perspective, 'Top');
+  assert.equal(state.overlaysEnabled, false);
+  assert.equal(state.objectLabelsEnabled, false);
+  assert.equal(state.physicsXrayEnabled, false);
+  assert.equal(state.collisionsEnabled, false);
+  assert.equal(state.floorEnabled, false);
+});
+
+test('object insight labels can be toggled independently from grid overlays', () => {
+  useStore.setState(useStore.getInitialState(), true);
+  assert.equal(useStore.getState().objectLabelsEnabled, false);
+
+  useStore.getState().setObjectLabelsEnabled(true);
+  let state = useStore.getState();
+  assert.equal(state.objectLabelsEnabled, true);
+  assert.equal(state.overlaysEnabled, true);
+
+  useStore.getState().toggleOverlays();
+  state = useStore.getState();
+  assert.equal(state.objectLabelsEnabled, true);
+  assert.equal(state.overlaysEnabled, false);
+});
+
+test('physics x-ray can be toggled independently from grid overlays', () => {
+  useStore.setState(useStore.getInitialState(), true);
+  assert.equal(useStore.getState().physicsXrayEnabled, false);
+
+  useStore.getState().setPhysicsXrayEnabled(true);
+  let state = useStore.getState();
+  assert.equal(state.physicsXrayEnabled, true);
+  assert.equal(state.overlaysEnabled, true);
+
+  useStore.getState().toggleOverlays();
+  state = useStore.getState();
+  assert.equal(state.physicsXrayEnabled, true);
+  assert.equal(state.overlaysEnabled, false);
+});
+
+test('showtime clamps its step index when the imported scene is replaced', () => {
+  useStore.setState(useStore.getInitialState(), true);
+  useStore.setState({
+    sceneObjects: [
+      { id: 'object_1', label: 'chair', physics: { category: 'furniture' } },
+      { id: 'object_2', label: 'table', physics: { category: 'furniture' } },
+      { id: 'object_3', label: 'lamp', physics: { category: 'lighting' } },
+      { id: 'object_4', label: 'vase', physics: { category: 'decor' } },
+    ],
+  });
+
+  useStore.getState().startShowtime();
+  useStore.getState().setShowtimeStep(5);
+  assert.equal(useStore.getState().showtimeStepIndex, 5);
+
+  useStore.getState().setImportedScene({
+    fileName: 'replacement.glb',
+    objects: [{ id: 'replacement_1', label: 'single chair' }],
+  });
+
+  const state = useStore.getState();
+  const maxIndex = buildShowtimeSteps({
+    sceneObjects: state.sceneObjects,
+    generatedTasks: state.generatedTasks,
+  }).length - 1;
+
+  assert.equal(state.showtimeEnabled, true);
+  assert.ok(state.showtimeStepIndex <= maxIndex);
 });
 
 test('project save and load round trips editor metadata without runtime object3d values', async () => {

@@ -14,6 +14,11 @@ import {
   serializeProjectState,
   writeSavedProject,
 } from '../lib/projectPersistence.js';
+import {
+  buildShowtimeSteps,
+  nextShowtimeStepIndex,
+  showtimeFocusForStep,
+} from '../lib/showtimeDirector.js';
 
 const DEFAULT_CHAT_MESSAGES = [
   { id: 1, sender: 'ai', text: 'Import a GLB scene, then ask me to edit objects or add generated assets.' },
@@ -40,6 +45,8 @@ const resettableProjectState = () => ({
   viewMode: 'material',
   perspective: 'Perspective',
   overlaysEnabled: true,
+  objectLabelsEnabled: false,
+  physicsXrayEnabled: false,
   gravityEnabled: false,
   collisionsEnabled: true,
   floorEnabled: true,
@@ -60,6 +67,9 @@ const resettableProjectState = () => ({
   assetSources: [],
   generatedTasks: [],
   highlightedObjectId: null,
+  showtimeEnabled: false,
+  showtimeStepIndex: 0,
+  showtimeReturnState: null,
   sceneBackground: {
     prompt: null,
     imageDataUrl: null,
@@ -135,6 +145,64 @@ function upsertBackgroundGallery(gallery, entry) {
   return next.slice(Math.max(0, next.length - BACKGROUND_GALLERY_LIMIT));
 }
 
+function showtimeFocusPatch(state, stepIndex, overrides = {}) {
+  const sceneObjects = overrides.sceneObjects ?? state.sceneObjects;
+  const generatedTasks = overrides.generatedTasks ?? state.generatedTasks;
+  const steps = buildShowtimeSteps({
+    sceneObjects,
+    generatedTasks,
+  });
+  const safeIndex = Math.max(0, Math.min(stepIndex, Math.max(steps.length - 1, 0)));
+  const focusId = showtimeFocusForStep(steps[safeIndex], sceneObjects);
+  return {
+    showtimeStepIndex: safeIndex,
+    selectedObjectId: focusId ?? overrides.fallbackSelectedObjectId ?? state.selectedObjectId,
+    highlightedObjectId: focusId ?? null,
+  };
+}
+
+function showtimeReturnState(state) {
+  return {
+    activeTool: state.activeTool,
+    viewMode: state.viewMode,
+    perspective: state.perspective,
+    overlaysEnabled: state.overlaysEnabled,
+    objectLabelsEnabled: state.objectLabelsEnabled,
+    physicsXrayEnabled: state.physicsXrayEnabled,
+    collisionsEnabled: state.collisionsEnabled,
+    floorEnabled: state.floorEnabled,
+    selectedObjectId: state.selectedObjectId,
+  };
+}
+
+function restoreShowtimePatch(state) {
+  const restored = state.showtimeReturnState;
+  if (!restored) {
+    return {
+      showtimeEnabled: false,
+      showtimeStepIndex: 0,
+      showtimeReturnState: null,
+      highlightedObjectId: null,
+    };
+  }
+
+  return {
+    ...restored,
+    selectedObjectId: selectableObjectId(restored.selectedObjectId, state.sceneObjects),
+    showtimeEnabled: false,
+    showtimeStepIndex: 0,
+    showtimeReturnState: null,
+    highlightedObjectId: null,
+  };
+}
+
+function selectableObjectId(objectId, sceneObjects = []) {
+  if (!objectId || objectId === 'Room_Mesh') return 'Room_Mesh';
+  return sceneObjects.some((object) => object.id === objectId)
+    ? objectId
+    : sceneObjects[0]?.id ?? 'Room_Mesh';
+}
+
 const useStore = create((set, get) => ({
   // App navigation
   currentView: 'landing',
@@ -159,6 +227,8 @@ const useStore = create((set, get) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   setPerspective: (perspective) => set({ perspective }),
   toggleOverlays: () => set((state) => ({ overlaysEnabled: !state.overlaysEnabled })),
+  setObjectLabelsEnabled: (objectLabelsEnabled) => set({ objectLabelsEnabled }),
+  setPhysicsXrayEnabled: (physicsXrayEnabled) => set({ physicsXrayEnabled }),
   setGravityEnabled: (gravityEnabled) => set({ gravityEnabled }),
   setCollisionsEnabled: (collisionsEnabled) => set({ collisionsEnabled }),
   setFloorEnabled: (floorEnabled) => set({ floorEnabled }),
@@ -168,6 +238,36 @@ const useStore = create((set, get) => ({
   // Hierarchy
   setSelectedObject: (id) => set({ selectedObjectId: id, highlightedObjectId: null }),
   setHighlightedObject: (id) => set({ highlightedObjectId: id }),
+  startShowtime: () =>
+    set((state) => ({
+      showtimeEnabled: true,
+      showtimeReturnState: state.showtimeEnabled
+        ? state.showtimeReturnState
+        : showtimeReturnState(state),
+      activeTool: 'select',
+      viewMode: 'material',
+      perspective: 'Perspective',
+      overlaysEnabled: true,
+      objectLabelsEnabled: true,
+      physicsXrayEnabled: true,
+      collisionsEnabled: true,
+      floorEnabled: true,
+      ...showtimeFocusPatch(state, 0),
+    })),
+  stopShowtime: () => set((state) => restoreShowtimePatch(state)),
+  setShowtimeStep: (stepIndex) =>
+    set((state) => ({
+      ...showtimeFocusPatch(state, stepIndex),
+    })),
+  advanceShowtime: (direction = 1) =>
+    set((state) => {
+      const steps = buildShowtimeSteps({
+        sceneObjects: state.sceneObjects,
+        generatedTasks: state.generatedTasks,
+      });
+      const nextIndex = nextShowtimeStepIndex(state.showtimeStepIndex, steps.length, direction);
+      return showtimeFocusPatch(state, nextIndex);
+    }),
   setSceneBackgroundStatus: (status, error = null) =>
     set((state) => ({
       sceneBackground: {
@@ -246,6 +346,13 @@ const useStore = create((set, get) => ({
   setImportedScene: ({ fileName, objects, warnings = [], assetSource = null }) =>
     set((state) => {
       const normalizedObjects = objects.map(normalizeSceneObject);
+      const selectedObjectId = objects[0]?.id ?? state.selectedObjectId;
+      const showtimePatch = state.showtimeEnabled
+        ? showtimeFocusPatch(state, state.showtimeStepIndex, {
+            sceneObjects: normalizedObjects,
+            fallbackSelectedObjectId: selectedObjectId,
+          })
+        : {};
       return {
         importedGlbFileName: fileName,
         sceneObjects: normalizedObjects,
@@ -253,32 +360,42 @@ const useStore = create((set, get) => ({
         glbImportStatus: 'ready',
         glbImportError: null,
         glbImportWarnings: warnings,
-        selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+        selectedObjectId,
         highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
         expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
         sceneObjectTransforms: {
           ...state.sceneObjectTransforms,
           ...transformMapForObjects(normalizedObjects),
         },
+        ...showtimePatch,
       };
     }),
   addImportedScene: ({ fileName, objects, warnings = [], assetSource = null }) =>
     set((state) => {
       const normalizedObjects = objects.map(normalizeSceneObject);
+      const nextSceneObjects = [...state.sceneObjects, ...normalizedObjects];
+      const selectedObjectId = objects[0]?.id ?? state.selectedObjectId;
+      const showtimePatch = state.showtimeEnabled
+        ? showtimeFocusPatch(state, state.showtimeStepIndex, {
+            sceneObjects: nextSceneObjects,
+            fallbackSelectedObjectId: selectedObjectId,
+          })
+        : {};
       return {
         importedGlbFileName: fileName,
-        sceneObjects: [...state.sceneObjects, ...normalizedObjects],
+        sceneObjects: nextSceneObjects,
         assetSources: upsertAssetSource(state.assetSources, assetSource),
         glbImportStatus: 'ready',
         glbImportError: null,
         glbImportWarnings: [...state.glbImportWarnings, ...warnings],
-        selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+        selectedObjectId,
         highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
         expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
         sceneObjectTransforms: {
           ...state.sceneObjectTransforms,
           ...transformMapForObjects(normalizedObjects),
         },
+        ...showtimePatch,
       };
     }),
   mergeManifestMetadata: ({ fileName, manifest }) =>
@@ -335,6 +452,9 @@ const useStore = create((set, get) => ({
       assetSources: [],
       selectedObjectId: 'Room_Mesh',
       highlightedObjectId: null,
+      showtimeEnabled: false,
+      showtimeStepIndex: 0,
+      showtimeReturnState: null,
       sceneBackground: {
         prompt: null,
         imageDataUrl: null,
@@ -382,6 +502,10 @@ const useStore = create((set, get) => ({
 
       set({
         ...hydrateProjectSnapshot(snapshot),
+        showtimeEnabled: false,
+        showtimeStepIndex: 0,
+        showtimeReturnState: null,
+        highlightedObjectId: null,
         savedProjectStatus: 'loaded',
         savedProjectError: null,
       });

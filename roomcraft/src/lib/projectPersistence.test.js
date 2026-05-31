@@ -56,6 +56,8 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
     highlightedObjectId: 'duck_01',
     gravityEnabled: true,
     collisionsEnabled: false,
+    objectLabelsEnabled: true,
+    physicsXrayEnabled: true,
     viewMode: 'wireframe',
     perspective: 'Top',
     sceneObjects: [object()],
@@ -78,8 +80,11 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.project.currentView, 'editor');
   assert.equal(snapshot.project.gravityEnabled, true);
   assert.equal(snapshot.project.collisionsEnabled, false);
+  assert.equal(snapshot.project.objectLabelsEnabled, true);
+  assert.equal(snapshot.project.physicsXrayEnabled, true);
   assert.equal(snapshot.project.viewMode, 'wireframe');
   assert.equal(snapshot.project.perspective, 'Top');
+  assert.equal(snapshot.project.highlightedObjectId, undefined);
   assert.deepEqual(snapshot.project.assetSources[0], {
     id: 'asset_duck',
     type: 'data-url',
@@ -90,6 +95,45 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.project.sceneObjects[0].object3d, undefined);
   assert.equal(snapshot.project.sceneObjects[0].physics.material, 'rubber');
   assert.equal(snapshot.project.chatMessages[0].text, 'save this');
+});
+
+test('serializeProjectState saves pre-showtime viewport state when presentation mode is active', () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    activeTool: 'select',
+    viewMode: 'material',
+    perspective: 'Perspective',
+    overlaysEnabled: true,
+    objectLabelsEnabled: true,
+    collisionsEnabled: true,
+    floorEnabled: true,
+    selectedObjectId: 'duck_01',
+    showtimeEnabled: true,
+    showtimeReturnState: {
+      activeTool: 'move',
+      viewMode: 'wireframe',
+      perspective: 'Top',
+      overlaysEnabled: false,
+      objectLabelsEnabled: false,
+      physicsXrayEnabled: false,
+      collisionsEnabled: false,
+      floorEnabled: false,
+      selectedObjectId: 'table_01',
+    },
+    sceneObjects: [object({ id: 'table_01', label: 'table' })],
+  });
+
+  assert.equal(snapshot.project.activeTool, 'move');
+  assert.equal(snapshot.project.viewMode, 'wireframe');
+  assert.equal(snapshot.project.perspective, 'Top');
+  assert.equal(snapshot.project.overlaysEnabled, false);
+  assert.equal(snapshot.project.objectLabelsEnabled, false);
+  assert.equal(snapshot.project.physicsXrayEnabled, false);
+  assert.equal(snapshot.project.collisionsEnabled, false);
+  assert.equal(snapshot.project.floorEnabled, false);
+  assert.equal(snapshot.project.selectedObjectId, 'table_01');
+  assert.equal(snapshot.project.showtimeEnabled, undefined);
+  assert.equal(snapshot.project.showtimeReturnState, undefined);
 });
 
 test('hydrateProjectSnapshot restores saved object metadata as metadata-only until meshes reload', () => {
@@ -114,6 +158,19 @@ test('hydrateProjectSnapshot restores saved object metadata as metadata-only unt
   assert.deepEqual(state.sceneObjectTransforms.duck_01.position, [1, 2, 3]);
 });
 
+test('hydrateProjectSnapshot falls back from stale selected object ids', () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    selectedObjectId: 'missing_object',
+    sceneObjects: [object({ id: 'duck_01' })],
+    assetSources: [],
+  });
+
+  const state = hydrateProjectSnapshot(snapshot);
+
+  assert.equal(state.selectedObjectId, 'duck_01');
+});
+
 test('hydrateProjectSnapshot defaults newly added viewport fields for older saved projects', () => {
   const snapshot = serializeProjectState({
     currentView: 'editor',
@@ -129,11 +186,15 @@ test('hydrateProjectSnapshot defaults newly added viewport fields for older save
     assetSources: [],
   });
   delete snapshot.project.floorEnabled;
+  delete snapshot.project.objectLabelsEnabled;
+  delete snapshot.project.physicsXrayEnabled;
   delete snapshot.project.backgroundGallery;
 
   const state = hydrateProjectSnapshot(snapshot);
 
   assert.equal(state.floorEnabled, true);
+  assert.equal(state.objectLabelsEnabled, false);
+  assert.equal(state.physicsXrayEnabled, false);
   assert.deepEqual(state.backgroundGallery, []);
   assert.deepEqual(state.sceneObjects[0].localBoundsCenter, [0, 0, 0]);
   assert.deepEqual(state.sceneObjects[0].localBoundsDimensions, [0.4, 0.3, 0.5]);
