@@ -232,6 +232,11 @@ const useStore = create((set, get) => ({
   setLeftPanelWidth: (w) => set({ leftPanelWidth: w }),
   setRightPanelWidth: (w) => set({ rightPanelWidth: w }),
 
+  // Picture mode — hides all UI chrome until the user clicks anywhere
+  pictureMode: false,
+  togglePictureMode: () => set((s) => ({ pictureMode: !s.pictureMode })),
+  exitPictureMode: () => set({ pictureMode: false }),
+
   // Viewport
   setActiveTool: (tool) => set({ activeTool: tool }),
   setViewMode: (mode) => set({ viewMode: mode }),

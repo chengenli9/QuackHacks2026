@@ -9,19 +9,24 @@ import RightPanel from './components/RightPanel/RightPanel';
 
 function App() {
   const currentView = useStore((s) => s.currentView);
+  const pictureMode = useStore((s) => s.pictureMode);
+  const exitPictureMode = useStore((s) => s.exitPictureMode);
 
   if (currentView === 'landing') {
     return <LandingPage />;
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
+      onClick={pictureMode ? exitPictureMode : undefined}
+    >
       <SavedProjectRequestHandler />
-      <TopBar />
+      {!pictureMode && <TopBar />}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
-        <LeftPanel />
+        {!pictureMode && <LeftPanel />}
         <Viewport />
-        <RightPanel />
+        {!pictureMode && <RightPanel />}
       </div>
     </div>
   );
