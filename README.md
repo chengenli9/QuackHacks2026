@@ -1,12 +1,12 @@
 # PRISM
 
-PRISM: Physics-aware Room Import, Segmentation, and Manipulation is a browser-based Scene-to-3D Physics Sandbox. The app imports completed GLB scenes, registers object-level editor handles, lets users inspect and edit physics/material metadata, runs Rapier physics, and uses chat-driven tools for scene changes, asset generation, backgrounds, project saves, and export.
+PRISM: Physics-aware Room Import, Segmentation, and Manipulation is a browser-based Scene-to-3D Physics Sandbox. The app imports completed GLB scenes, registers object-level editor handles, lets users inspect and edit physics/material metadata, runs Rapier physics, and uses Gemini-driven chat tools for scene changes, asset generation, backgrounds, project saves, and export.
 
-SceneGen remains an external preprocessing step. The runtime app focuses on completed GLBs, optional manifests, editor-authoritative transforms, validated AI/tool operations, Meshy-generated GLB insertion, Gemini-backed semantic/background workflows, local fallbacks, and project persistence.
+SceneGen remains an external or configured preprocessing step. The runtime app focuses on completed GLBs, optional manifests, editor-authoritative transforms, validated AI/tool operations, Meshy-generated GLB insertion, Gemini-backed semantic/background workflows, explicit local fallbacks, project persistence, and an optional Photo to Scene upload flow with automatic JPEG conversion for HEIC/other image formats.
 
 ## Core Demo
 
-1. Load a curated or user-provided SceneGen GLB.
+1. Load a curated/user-provided SceneGen GLB or submit a room photo to a configured SceneGen service.
 2. Register separate editable scene objects from GLB nodes.
 3. Select objects from the viewport or outliner.
 4. Edit transforms, material appearance, and physics properties.
@@ -14,8 +14,9 @@ SceneGen remains an external preprocessing step. The runtime app focuses on comp
 6. Chat: `add a rubber duck on the coffee table`.
 7. Start Meshy preview/refine generation and show task state.
 8. Import the textured GLB returned through the backend cache/proxy.
-9. Chat: `make the duck bouncier` or multi-edit commands such as `make the duck red and bouncy, make the table metallic and fixed`.
-10. Save/open named projects and export `scene.glb` plus `scene.physics.json`.
+9. Chat: `make the duck bouncier`, `make the objects red`, or multi-edit commands such as `make the duck red and bouncy, make the table metallic and fixed`.
+10. Chat: `make the background a low-poly field with a black sky with orange highlights`.
+11. Save/open named projects and export `scene.glb` plus `scene.physics.json`.
 
 ## Documentation
 
@@ -72,14 +73,18 @@ Run the backend:
 
 ```bash
 cd server
+$env:PORT=8790
+$env:HOST="127.0.0.1"
+$env:SERVER_PUBLIC_URL="http://127.0.0.1:8790"
 npm run dev
 ```
 
-Run the frontend:
+Run the frontend on the final local demo port:
 
 ```bash
 cd roomcraft
-npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+$env:VITE_API_BASE_URL="http://127.0.0.1:8790"
+npm run dev -- --host 127.0.0.1 --port 4174 --strictPort
 ```
 
 Common checks:
@@ -113,11 +118,12 @@ Backend `.env` keys live in `server/.env`.
 Frontend environment:
 
 - `VITE_API_BASE_URL`: backend API base URL, default `http://127.0.0.1:8787`.
+- `VITE_SCENEGEN_API_BASE_URL`: optional external SceneGen service URL for the Photo to Scene panel.
 
 ## Critical Architecture Rule
 
-AI providers never mutate scene state directly. AI and local parsers return validated structured JSON. The frontend dispatches accepted operations into the Zustand scene store, and Three/Rapier react to store updates.
+AI providers never mutate scene state directly. Gemini returns structured JSON operations, the backend normalizes common model output shapes and validates them with Zod, then the frontend dispatches accepted operations into the Zustand scene store. Three/Rapier react to store updates.
 
 ## Demo Priority
 
-Live Meshy generation is the primary wow path. Local GLB assets are deterministic fallbacks when Meshy is unavailable, slow, rate-limited, or missing a usable model. Gemini-powered VLM labels, background images, and multi-step chat tools support the demo but remain behind server-side API keys with deterministic local fallbacks where possible.
+Live Meshy generation is the primary 3D asset path. Local GLB assets are explicit fallbacks when Meshy is unavailable, slow, rate-limited, or missing a usable model. Gemini-powered VLM labels, background images, and multi-step chat tools support the demo behind server-side API keys. Without `GEMINI_API_KEY`, chat returns a clear unavailable message instead of silently applying deterministic scene edits.

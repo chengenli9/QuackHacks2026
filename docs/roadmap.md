@@ -29,7 +29,7 @@ The frontend is not currently TypeScript and does not use immer or frontend Zod.
 
 - `/api/command` returns validated `operation`, `operations[]`, or conversational `message`.
 - Gemini is the primary configured chat parser when `GEMINI_API_KEY` exists.
-- Deterministic local parser handles no-key demo flows and multi-operation edits.
+- Missing `GEMINI_API_KEY` returns a clear no-op unavailable message; deterministic rule parsing is retained only for legacy/unit coverage and explicit test injection.
 - Chat supports visible plan/thought lines and ordered tool-call status bubbles.
 - Supported operations include generated/local object insertion, transforms, physics edits, appearance edits, gravity/collision toggles, export, relabel, background generation, and environment-scene generation.
 
@@ -47,6 +47,7 @@ The frontend is not currently TypeScript and does not use immer or frontend Zod.
 - Local fallback assets are served explicitly through `/assets/fallback/:file` and `/api/generated-assets/fallback`.
 - Object semantic/physics/appearance estimation uses Gemini when configured, local rules without keys, and OpenAI as secondary object-estimator fallback.
 - Gemini background generation is exposed through `/api/background-image`.
+- Photo to Scene uploads can target a configured external SceneGen service, and the backend exposes `/api/convert-image/jpeg` so HEIC/unsupported image uploads are converted before submission.
 - Named project save/open persists project JSON, bundled GLB assets, generated backgrounds, chat context, and editor settings under `PROJECT_STORAGE_DIR`.
 - Browser local storage/IndexedDB mirror protects against backend save/load failures.
 

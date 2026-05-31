@@ -20,6 +20,7 @@ Backend
   Zod request/response/model validation
   /api/command
   /api/background-image
+  /api/convert-image/jpeg
   /api/estimate-object
   /api/generate-asset
   /api/generated-assets/:id/status
@@ -28,7 +29,7 @@ Backend
   /assets/fallback/:file
 
 External
-  SceneGen preprocessing, manual/offline
+  SceneGen preprocessing, manual/offline or configured external service
   Meshy preview/refine text-to-3D
   Gemini chat/object/background providers
   Optional OpenAI object estimator fallback
@@ -39,6 +40,8 @@ External
 ```mermaid
 flowchart LR
   SceneGen["SceneGen offline preprocessing"] --> GLB["scene.glb and optional manifest.json"]
+  Photo["Room photo upload"] --> SceneGenService["Configured SceneGen service"]
+  SceneGenService --> GLB
   GLB --> Importer["Frontend import pipeline"]
   Importer --> Registry["Object registry"]
   Registry --> Store["Zustand scene store"]
@@ -73,6 +76,7 @@ The backend owns external side effects:
 - VLM metadata estimation through Gemini or local/OpenAI fallback providers.
 - Gemini background image generation.
 - Meshy preview/refine task creation, status polling, GLB retrieval, and cache/proxy serving.
+- JPEG conversion for SceneGen photo uploads that arrive as HEIC/other unsupported image formats.
 - Local fallback asset resolution.
 - Project folder persistence for saved project JSON, bundled GLBs, and generated backgrounds.
 

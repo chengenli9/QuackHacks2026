@@ -39,7 +39,7 @@ Supported variables:
 - `PROJECT_STORAGE_DIR`: default `storage/projects`.
 - `REQUEST_BODY_LIMIT_BYTES`: default `104857600`.
 
-Without `MESHY_API_KEY`, live generation routes return clear unavailable errors. Without `GEMINI_API_KEY`, chat uses deterministic local parsing, object estimation uses local rules unless OpenAI is configured, and background generation returns a clear unavailable error.
+Without `MESHY_API_KEY`, live generation routes return clear unavailable errors. Without `GEMINI_API_KEY`, chat returns a clear no-op unavailable message, object estimation uses local rules unless OpenAI is configured, and background generation returns a clear unavailable error. The deterministic rule parser remains available for legacy/unit tests, but the product chat path is Gemini-authoritative when configured.
 
 Put deterministic fallback GLBs in `server/public/assets/fallback` or set `FALLBACK_ASSET_DIR`. Required filenames are `rubber_ball.glb`, `wooden_crate.glb`, `glass_vase.glb`, `metal_barrel.glb`, and `duck.glb`. Missing fallback files return `FallbackAssetFileMissing`.
 
@@ -57,6 +57,7 @@ npm start
 - `GET /health`
 - `POST /api/command`
 - `POST /api/background-image`
+- `POST /api/convert-image/jpeg`
 - `POST /api/estimate-object`
 - `POST /api/generate-asset`
 - `GET /api/generated-assets/:id/status`

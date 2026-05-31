@@ -4,9 +4,9 @@ Updated: 2026-05-31
 
 ## Build Goal
 
-PRISM: Physics-aware Room Import, Segmentation, and Manipulation is a GLB-import-first 3D physics editor where users load a pre-generated scene, interact with object-level physics/materials, edit the scene through chat, generate new 3D assets with Meshy, generate backgrounds with Gemini, save projects, and export the updated scene.
+PRISM: Physics-aware Room Import, Segmentation, and Manipulation is a GLB-import-first 3D physics editor where users load a pre-generated scene, optionally submit a photo to a configured SceneGen service, interact with object-level physics/materials, edit the scene through chat, generate new 3D assets with Meshy, generate backgrounds with Gemini, save projects, and export the updated scene.
 
-SceneGen remains outside the critical runtime path. It can be used manually or through a later preprocessing pipeline, but the live demo does not depend on runtime scene reconstruction.
+SceneGen remains outside the critical runtime path. It can be used manually, through the optional Photo to Scene panel, or through a later preprocessing pipeline, but the live demo does not depend on runtime scene reconstruction.
 
 ## Product Promise
 
@@ -15,7 +15,7 @@ The user can turn a reconstructed 3D scene into an editable physics sandbox. The
 ## Main User Flow
 
 ```text
-Load pre-generated SceneGen GLB
+Load pre-generated SceneGen GLB or submit room photo to configured SceneGen service
 -> Register editable scene objects
 -> Select and inspect objects
 -> Estimate or merge object metadata and physics
@@ -36,27 +36,28 @@ Load pre-generated SceneGen GLB
 
 1. Import pre-generated SceneGen/user GLBs.
 2. Import optional `manifest.json`.
-3. Register editable objects from GLB nodes.
-4. Select objects from viewport and outliner.
-5. Move, rotate, and scale objects with editor-authoritative transforms.
-6. Show and edit object inspector fields.
-7. Toggle gravity, collisions, floor, object labels, and physics x-ray.
-8. Simulate physics with Rapier.
-9. Estimate object semantic, physics, and appearance metadata.
-10. Normalize metadata into physics profiles.
-11. Parse chat into validated single or multi-operation scene edits.
-12. Live-generate Meshy GLBs from chat through preview/refine flow.
-13. Show generated-task placeholder/progress states.
-14. Insert generated GLBs into the scene and select/highlight new objects.
-15. Provide explicit local fallback asset insertion.
-16. Generate Gemini background images when configured.
-17. Save/open named projects with bundled GLBs/backgrounds.
-18. Export `scene.glb`.
-19. Export `scene.physics.json`.
+3. Submit room photos to a configured SceneGen service, with HEIC/unsupported image formats converted to JPEG before upload.
+4. Register editable objects from GLB nodes.
+5. Select objects from viewport and outliner.
+6. Move, rotate, and scale objects with editor-authoritative transforms.
+7. Show and edit object inspector fields.
+8. Toggle gravity, collisions, floor, object labels, and physics x-ray.
+9. Simulate physics with Rapier.
+10. Estimate object semantic, physics, and appearance metadata.
+11. Normalize metadata into physics profiles.
+12. Parse Gemini chat into validated single or multi-operation scene edits.
+13. Live-generate Meshy GLBs from chat through preview/refine flow.
+14. Show generated-task placeholder/progress states.
+15. Insert generated GLBs into the scene and select/highlight new objects.
+16. Provide explicit local fallback asset insertion.
+17. Generate Gemini background images when configured.
+18. Save/open named projects with bundled GLBs/backgrounds.
+19. Export `scene.glb`.
+20. Export `scene.physics.json`.
 
 ## Optional / Future Features
 
-- Live SceneGen reconstruction inside the app.
+- Built-in SceneGen GPU reconstruction service; current app expects an external/configured service.
 - VGGT integration.
 - Cloud GPU reconstruction jobs.
 - Video reconstruction.
@@ -80,7 +81,7 @@ Required fallback filenames:
 
 ## Demo Script
 
-1. Load curated SceneGen living-room GLB or a user GLB.
+1. Load curated SceneGen living-room GLB, a user GLB, or a GLB produced from the Photo to Scene panel.
 2. Show object registration, viewport selection, and outliner selection.
 3. Select table, couch, and vase; show semantic/physics metadata.
 4. Toggle object labels or physics x-ray.

@@ -113,6 +113,23 @@ type BackgroundImageResponse = {
 };
 ```
 
+## Image Conversion
+
+### `POST /api/convert-image/jpeg`
+
+Converts an uploaded image body to JPEG with ffmpeg. The frontend uses this before submitting HEIC/HEIF/TIFF/BMP/AVIF or otherwise unsupported photos to the configured SceneGen service.
+
+Request:
+
+- Body: raw image bytes.
+- `Content-Type`: source image MIME type, for example `image/heic`.
+- `X-File-Name`: optional URL-encoded original filename.
+
+Response:
+
+- Body: JPEG bytes.
+- `Content-Type`: `image/jpeg`.
+
 ## Generated Assets
 
 ### `POST /api/generate-asset`
