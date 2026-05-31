@@ -12,12 +12,12 @@ cleanup() {
 }
 trap cleanup INT TERM
 
-echo "Starting backend (server)..."
-cd "$SCRIPT_DIR/server" && npm run dev &
+echo "Starting backend (backend)..."
+cd "$SCRIPT_DIR/backend" && npm run dev &
 BACKEND_PID=$!
 
-echo "Starting frontend (roomcraft)..."
-cd "$SCRIPT_DIR/roomcraft" && npm run dev &
+echo "Starting frontend (frontend)..."
+cd "$SCRIPT_DIR/frontend" && npm run dev &
 FRONTEND_PID=$!
 
 echo "Frontend PID: $FRONTEND_PID | Backend PID: $BACKEND_PID"
