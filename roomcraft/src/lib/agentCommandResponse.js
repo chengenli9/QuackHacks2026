@@ -11,6 +11,12 @@ export function visibleThoughtsFromCommandResponse(response = {}) {
     : [];
 }
 
+export function answerTextFromCommandResponse(response = {}) {
+  return typeof response.message === 'string' && response.message.trim()
+    ? response.message
+    : 'No agent response was returned.';
+}
+
 export function toolCallLabel(operation = {}) {
   switch (operation.action) {
     case 'add_generated_object':

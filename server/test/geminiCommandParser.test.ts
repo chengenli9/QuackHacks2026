@@ -54,6 +54,7 @@ describe("GeminiCommandParser", () => {
     expect(requestBody.contents[0].parts[0].text).toContain("Available tools");
     expect(requestBody.contents[0].parts[0].text).toContain("Reply conversationally");
     expect(requestBody.contents[0].parts[0].text).toContain("one or more ordered editor tool calls");
+    expect(requestBody.contents[0].parts[0].text).toContain("one tool call per target object");
     expect(requestBody.contents[0].parts[0].text).toContain("current object transforms");
     expect(response.operation).toEqual({
       action: "update_object_physics",

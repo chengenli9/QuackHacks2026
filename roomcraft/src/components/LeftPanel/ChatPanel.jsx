@@ -10,6 +10,7 @@ import {
   requestSceneCommand,
 } from '../../lib/apiClient';
 import {
+  answerTextFromCommandResponse,
   operationsFromCommandResponse,
   toolCallLabel,
   visibleThoughtsFromCommandResponse,
@@ -105,7 +106,7 @@ export default function ChatPanel() {
           id: nextMessageId(),
           sender: 'ai',
           kind: 'answer',
-          text: response.message ?? 'I can help edit the scene when you ask for a specific change.',
+          text: answerTextFromCommandResponse(response),
         });
       }
     } catch (error) {

@@ -94,6 +94,76 @@ describe("extended local command parser", () => {
     });
   });
 
+  it("parses multi-object material edits from one prompt", () => {
+    expect(
+      parseSceneOperations({
+        message: "make the duck red and the table blue",
+        sceneContext
+      })
+    ).toEqual([
+      {
+        action: "update_object_appearance",
+        target: "duck_01",
+        changes: { baseColor: "#ff0000" }
+      },
+      {
+        action: "update_object_appearance",
+        target: "table_01",
+        changes: { baseColor: "#1f6fff" }
+      }
+    ]);
+  });
+
+  it("parses multiple property categories across multiple objects", () => {
+    expect(
+      parseSceneOperations({
+        message: "make the duck red and bouncy, make the table metallic and fixed",
+        sceneContext
+      })
+    ).toEqual([
+      {
+        action: "update_object_appearance",
+        target: "duck_01",
+        changes: { baseColor: "#ff0000" }
+      },
+      {
+        action: "update_object_physics",
+        target: "duck_01",
+        changes: { restitution: 0.85 }
+      },
+      {
+        action: "update_object_appearance",
+        target: "table_01",
+        changes: { metalness: 0.85 }
+      },
+      {
+        action: "update_object_physics",
+        target: "table_01",
+        changes: { static: true }
+      }
+    ]);
+  });
+
+  it("parses all-object batch appearance edits", () => {
+    expect(
+      parseSceneOperations({
+        message: "make all objects matte green and nonmetallic",
+        sceneContext
+      })
+    ).toEqual([
+      {
+        action: "update_object_appearance",
+        target: "duck_01",
+        changes: { baseColor: "#00a651", roughness: 0.9, metalness: 0 }
+      },
+      {
+        action: "update_object_appearance",
+        target: "table_01",
+        changes: { baseColor: "#00a651", roughness: 0.9, metalness: 0 }
+      }
+    ]);
+  });
+
   it("uses the selected object for this/it follow-up editing commands", () => {
     expect(
       parseSceneCommand({
@@ -187,6 +257,23 @@ describe("extended local command parser", () => {
 
     expect(response.message).toContain("scene");
     expect(response.message).not.toContain("I can chat about the scene");
+  });
+
+  it("answers scene questions without canned edit fallback text", async () => {
+    const response = await buildCommandResponse({
+      message: "why is the duck falling?",
+      sceneContext: {
+        ...sceneContext,
+        selectedObjectId: "duck_01",
+        gravityEnabled: true,
+        collisionsEnabled: true
+      }
+    });
+
+    expect(response.message).toContain("gravity");
+    expect(response.message).toContain("rubber duck");
+    expect(response.message).not.toContain("Ask a question");
+    expect(response.message).not.toContain("describe the edit");
   });
 
   it("falls back to local parsing when the primary command parser fails", async () => {

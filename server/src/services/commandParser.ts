@@ -114,15 +114,33 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
 
 export const parseSceneOperations = (input: CommandRequest): SceneOperation[] => {
   const request = commandRequestSchema.parse(input);
+  const normalized = normalize(request.message);
+  const editOperations = parseTargetedEditOperations(
+    request.message,
+    normalized,
+    request.sceneContext.objects,
+    request.sceneContext.selectedObjectId
+  );
+  if (editOperations.length > 0) {
+    return editOperations;
+  }
+
   const segments = splitCommandSegments(request.message);
 
   if (segments.length > 1) {
-    return segments.map((segment) =>
-      parseSceneCommand({
+    return segments.flatMap((segment) => {
+      const segmentOperations = parseTargetedEditOperations(
+        segment,
+        normalize(segment),
+        request.sceneContext.objects,
+        request.sceneContext.selectedObjectId
+      );
+      if (segmentOperations.length > 0) return segmentOperations;
+      return [parseSceneCommand({
         ...request,
         message: segment
-      })
-    );
+      })];
+    });
   }
 
   try {
@@ -167,9 +185,23 @@ export const buildCommandResponse = async (input: CommandRequest) => {
 function conversationalFallbackMessage(input: CommandRequest) {
   const request = commandRequestSchema.parse(input);
   const objectCount = request.sceneContext.objects.length;
+  const normalized = normalize(request.message);
   const selectedObject = request.sceneContext.objects.find(
     (object) => object.id === request.sceneContext.selectedObjectId
   );
+  const mentionedObject = findMentionedObject(
+    normalized,
+    request.sceneContext.objects,
+    request.sceneContext.selectedObjectId
+  );
+
+  if (/\b(why|what|how)\b/.test(normalized) && /\b(fall|falling|drop|dropping|gravity|snap|snapping)\b/.test(normalized)) {
+    const object = mentionedObject ?? selectedObject;
+    const subject = object?.label ?? "A dynamic object";
+    const gravityState = request.sceneContext.gravityEnabled === false ? "off" : "on";
+    const bodyState = object?.static ? "fixed/static" : "dynamic";
+    return `${subject} can move or fall when gravity is ${gravityState} and its body is ${bodyState}. To keep it in place, make it fixed/static or turn gravity off before moving it.`;
+  }
 
   if (/\b(what can you do|help|capabilities|how do you work)\b/i.test(request.message)) {
     const sceneSummary = objectCount
@@ -185,8 +217,8 @@ function conversationalFallbackMessage(input: CommandRequest) {
   }
 
   return selectedObject
-    ? `${selectedObject.label} is selected. Ask a follow-up question or describe the edit you want.`
-    : "Ask a question, describe a scene edit, or select an object and refer to it as this or it.";
+    ? `${selectedObject.label} is selected. I can answer questions about it or run validated edit tools when you request changes.`
+    : "I can answer scene questions or run validated edit tools after you reference an object, add an asset, or import a GLB.";
 }
 
 const parseEnvironmentSceneCommand = (
@@ -338,6 +370,172 @@ const parseRelabelCommand = (
   });
 };
 
+const parseTargetedEditOperations = (
+  message: string,
+  normalized: string,
+  objects: SceneObject[],
+  selectedObjectId?: string
+): SceneOperation[] => {
+  if (!/\b(make|set|turn|change|color|paint)\b/.test(normalized)) {
+    return [];
+  }
+
+  const clauses = targetedObjectClauses(normalized, objects, selectedObjectId);
+  if (clauses.length === 0) return [];
+
+  const operations: SceneOperation[] = [];
+  for (const clause of clauses) {
+    const appearanceChanges = appearanceChangesFor(message, clause.text);
+    if (Object.keys(appearanceChanges).length > 0) {
+      operations.push(validateOperation({
+        action: "update_object_appearance",
+        target: clause.object.id,
+        changes: appearanceChanges
+      }));
+    }
+
+    const physicsChanges = physicsChangesFor(message, clause.text);
+    if (Object.keys(physicsChanges).length > 0) {
+      operations.push(validateOperation({
+        action: "update_object_physics",
+        target: clause.object.id,
+        changes: physicsChanges
+      }));
+    }
+  }
+
+  return operations;
+};
+
+function targetedObjectClauses(
+  normalized: string,
+  objects: SceneObject[],
+  selectedObjectId?: string
+) {
+  if (/\b(all objects|all assets|every object|everything)\b/.test(normalized)) {
+    return objects.map((object) => ({ object, text: normalized }));
+  }
+
+  const mentions = objects
+    .map((object) => {
+      const index = firstObjectMentionIndex(normalized, object);
+      return index >= 0 ? { object, index } : null;
+    })
+    .filter((mention): mention is { object: SceneObject; index: number } => Boolean(mention))
+    .sort((a, b) => a.index - b.index);
+
+  if (mentions.length === 0 && selectedObjectId && /\b(it|this|that|selected|selection|object)\b/.test(normalized)) {
+    const selected = objects.find((object) => object.id === selectedObjectId);
+    return selected ? [{ object: selected, text: normalized }] : [];
+  }
+
+  return mentions.map((mention, index) => {
+    const next = mentions[index + 1];
+    const start = mention.index;
+    const end = next?.index ?? normalized.length;
+    return {
+      object: mention.object,
+      text: normalized.slice(start, end).trim()
+    };
+  });
+}
+
+function firstObjectMentionIndex(normalized: string, object: SceneObject) {
+  const aliases = objectAliases(object);
+  let best = -1;
+  for (const alias of aliases) {
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = normalized.match(new RegExp(`\\b${escaped}\\b`));
+    if (match?.index !== undefined && (best < 0 || match.index < best)) {
+      best = match.index;
+    }
+  }
+  return best;
+}
+
+function objectAliases(object: SceneObject) {
+  const aliases = new Set<string>();
+  const label = normalize(object.label);
+  const id = normalize(object.id).replaceAll("_", " ");
+  if (label) aliases.add(label);
+  if (id) aliases.add(id);
+  for (const token of label.split(" ")) {
+    if (token.length > 2) aliases.add(token);
+  }
+  for (const token of id.split(" ")) {
+    if (token.length > 2) aliases.add(token);
+  }
+  return Array.from(aliases).sort((a, b) => b.length - a.length);
+}
+
+const appearanceChangesFor = (
+  message: string,
+  normalized: string
+): Record<string, string | number> => {
+  const changes: Record<string, string | number> = {};
+  const hex = message.match(/#[0-9a-fA-F]{6}\b/)?.[0];
+  const namedColor = colorFor(normalized);
+  const color = hex ?? namedColor;
+  if (color) {
+    changes.baseColor = color;
+  }
+
+  const roughness = numericProperty(normalized, "roughness");
+  if (roughness !== undefined) changes.roughness = roughness;
+  if (/\b(matte|flat|rough)\b/.test(normalized)) changes.roughness = changes.roughness ?? 0.9;
+  if (/\b(glossy|shiny|polished|smooth)\b/.test(normalized)) changes.roughness = changes.roughness ?? 0.22;
+
+  const metalness = numericProperty(normalized, "metalness") ?? numericProperty(normalized, "metallic");
+  if (metalness !== undefined) changes.metalness = metalness;
+  if (/\b(nonmetal|nonmetallic|non metallic|not metallic|plastic)\b/.test(normalized)) {
+    changes.metalness = 0;
+  } else if (/\b(metallic|metal|chrome|steel)\b/.test(normalized)) {
+    changes.metalness = changes.metalness ?? 0.85;
+  }
+
+  return changes;
+};
+
+const physicsChangesFor = (
+  message: string,
+  normalized: string
+): Record<string, number | boolean | string> => {
+  const changes: Record<string, number | boolean | string> = {};
+  const friction = numericProperty(message, "friction");
+  if (friction !== undefined) changes.friction = friction;
+
+  const restitution = numericProperty(message, "restitution") ?? numericProperty(message, "bounce");
+  if (restitution !== undefined) changes.restitution = restitution;
+
+  const massKg = numericProperty(message, "mass");
+  if (massKg !== undefined) changes.massKg = massKg;
+
+  const collider = colliderFor(normalized);
+  if (collider) changes.collider = collider;
+
+  if (/\b(bouncy|bouncier|bounce|springier)\b/.test(normalized)) {
+    changes.restitution = changes.restitution ?? 0.85;
+  }
+
+  if (/\bheavier|heavy\b/.test(normalized)) {
+    changes.massKg = changes.massKg ?? 8;
+  }
+
+  if (/\blighter|light\b/.test(normalized)) {
+    changes.massKg = changes.massKg ?? 0.5;
+  }
+
+  if (/\bstatic|fixed|immovable\b/.test(normalized)) {
+    changes.static = true;
+  }
+
+  if (/\bdynamic|movable\b/.test(normalized)) {
+    changes.static = false;
+  }
+
+  return changes;
+};
+
 const parseAppearanceCommand = (
   message: string,
   normalized: string,
@@ -351,27 +549,7 @@ const parseAppearanceCommand = (
   const target = findMentionedObject(normalized, objects, selectedObjectId);
   if (!target) return undefined;
 
-  const changes: Record<string, string | number> = {};
-  const hex = message.match(/#[0-9a-fA-F]{6}\b/)?.[0];
-  const namedColor = colorFor(normalized);
-  const color = hex ?? namedColor;
-  if (color) {
-    changes.baseColor = color;
-  }
-
-  const roughness = numericProperty(message, "roughness");
-  if (roughness !== undefined) changes.roughness = roughness;
-  if (/\b(matte|flat|rough)\b/.test(normalized)) changes.roughness = changes.roughness ?? 0.9;
-  if (/\b(glossy|shiny|polished|smooth)\b/.test(normalized)) changes.roughness = changes.roughness ?? 0.22;
-
-  const metalness = numericProperty(message, "metalness") ?? numericProperty(message, "metallic");
-  if (metalness !== undefined) changes.metalness = metalness;
-  if (/\b(nonmetal|non metallic|not metallic|plastic)\b/.test(normalized)) {
-    changes.metalness = 0;
-  } else if (/\b(metallic|metal|chrome|steel)\b/.test(normalized)) {
-    changes.metalness = changes.metalness ?? 0.85;
-  }
-
+  const changes = appearanceChangesFor(message, normalized);
   if (Object.keys(changes).length === 0) {
     return undefined;
   }
@@ -399,83 +577,14 @@ const parsePhysicsCommand = (
     return undefined;
   }
 
-  const friction = numericProperty(message, "friction");
-  if (friction !== undefined) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { friction }
-    });
-  }
-
-  const restitution = numericProperty(message, "restitution") ?? numericProperty(message, "bounce");
-  if (restitution !== undefined) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { restitution }
-    });
-  }
-
-  const massKg = numericProperty(message, "mass");
-  if (massKg !== undefined) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { massKg }
-    });
-  }
-
-  const collider = colliderFor(normalized);
-  if (collider) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { collider }
-    });
-  }
-
-  if (/\bbouncier|bounce|springier\b/.test(normalized)) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { restitution: 0.85 }
-    });
-  }
-
-  if (/\bheavier|heavy\b/.test(normalized)) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { massKg: 8 }
-    });
-  }
-
-  if (/\blighter|light\b/.test(normalized)) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { massKg: 0.5 }
-    });
-  }
-
-  if (/\bstatic|fixed|immovable\b/.test(normalized)) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { static: true }
-    });
-  }
-
-  if (/\bdynamic|movable\b/.test(normalized)) {
-    return validateOperation({
-      action: "update_object_physics",
-      target: target.id,
-      changes: { static: false }
-    });
-  }
-
-  return undefined;
+  const changes = physicsChangesFor(message, normalized);
+  return Object.keys(changes).length > 0
+    ? validateOperation({
+        action: "update_object_physics",
+        target: target.id,
+        changes
+      })
+    : undefined;
 };
 
 const parseRemoveCommand = (

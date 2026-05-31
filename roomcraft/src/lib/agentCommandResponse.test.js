@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  answerTextFromCommandResponse,
   operationsFromCommandResponse,
   toolCallLabel,
   visibleThoughtsFromCommandResponse,
@@ -32,4 +33,9 @@ test('toolCallLabel formats editor tools for chat status bubbles', () => {
     toolCallLabel({ action: 'generate_background_image', prompt: 'neon horizon' }),
     'generate_background_image("neon horizon")'
   );
+});
+
+test('answerTextFromCommandResponse avoids canned edit fallback text', () => {
+  assert.equal(answerTextFromCommandResponse({ message: 'Gravity is on.' }), 'Gravity is on.');
+  assert.equal(answerTextFromCommandResponse({}), 'No agent response was returned.');
 });
