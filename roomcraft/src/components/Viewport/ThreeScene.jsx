@@ -26,7 +26,13 @@ import {
   placementPositionForTask,
 } from '../../lib/generatedTaskState';
 import { applyObjectAppearance } from '../../lib/objectAppearance';
+import {
+  buildObjectInsightLabel,
+  labelPositionForObject,
+  shouldShowObjectInsightLabel,
+} from '../../lib/objectInsightLabels';
 import { rapierBodyTypeFor, rapierColliderFor } from '../../lib/rapierMapping';
+import styles from './Viewport.module.css';
 
 const CAMERA_PRESETS = {
   Perspective: { position: [5, 3.2, 5], target: [0, 0, 0], up: [0, 1, 0] },
@@ -98,10 +104,18 @@ function EditorFloor({ sceneObjects }) {
   );
 }
 
-function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnabled, onDragStateChange }) {
+function ImportedSceneObject({
+  object,
+  isSelected,
+  isHighlighted,
+  isLabeled,
+  collisionsEnabled,
+  onDragStateChange,
+}) {
   const bodyRef = useRef(null);
   const hitboxRef = useRef(null);
   const highlightRef = useRef(null);
+  const labelRef = useRef(null);
   const isEditorDraggingRef = useRef(false);
   const lastRuntimePositionRef = useRef(object.transform.position);
   const [isEditorDragging, setIsEditorDragging] = useState(false);
@@ -124,6 +138,9 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
       if (!group) continue;
       group.position.set(translation.x, translation.y, translation.z);
       group.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    }
+    if (labelRef.current) {
+      labelRef.current.position.set(translation.x, translation.y, translation.z);
     }
   };
 
@@ -267,6 +284,7 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
       )}
 
       {isHighlighted && <ObjectHighlight ref={highlightRef} object={object} />}
+      {isLabeled && <ObjectInsightLabel ref={labelRef} object={object} />}
     </>
   );
 }
@@ -294,7 +312,7 @@ const ObjectSelectionHitbox = forwardRef(function ObjectSelectionHitbox({ object
   );
 });
 
-function ImportedPhysicsScene({ sceneObjects, selectedObjectId, onDragStateChange }) {
+function ImportedPhysicsScene({ sceneObjects, selectedObjectId, objectLabelsEnabled, onDragStateChange }) {
   const gravityEnabled = useStore((state) => state.gravityEnabled);
   const collisionsEnabled = useStore((state) => state.collisionsEnabled);
   const floorEnabled = useStore((state) => state.floorEnabled);
@@ -310,6 +328,7 @@ function ImportedPhysicsScene({ sceneObjects, selectedObjectId, onDragStateChang
           object={object}
           isSelected={selectedObjectId === object.id}
           isHighlighted={highlightedObjectId === object.id}
+          isLabeled={shouldShowObjectInsightLabel(object, objectLabelsEnabled)}
           collisionsEnabled={collisionsEnabled}
           onDragStateChange={onDragStateChange}
         />
@@ -337,6 +356,32 @@ const ObjectHighlight = forwardRef(function ObjectHighlight({ object }, ref) {
         <boxGeometry args={dimensions} />
         <meshBasicMaterial color="#00e5ca" wireframe transparent opacity={0.9} depthTest={false} />
       </mesh>
+    </group>
+  );
+});
+
+const ObjectInsightLabel = forwardRef(function ObjectInsightLabel({ object }, ref) {
+  const insight = buildObjectInsightLabel(object);
+  const worldPosition = labelPositionForObject(object);
+  const objectPosition = object.transform?.position ?? [0, 0, 0];
+  const localPosition = [
+    worldPosition[0] - objectPosition[0],
+    worldPosition[1] - objectPosition[1],
+    worldPosition[2] - objectPosition[2],
+  ];
+
+  return (
+    <group ref={ref} position={objectPosition}>
+      <Html center position={localPosition} distanceFactor={9} occlude>
+        <div className={styles.objectInsightLabel}>
+          <strong>{insight.title}</strong>
+          <span>{insight.subtitle}</span>
+          {insight.metrics.length > 0 && (
+            <small>{insight.metrics.slice(0, 3).join(' | ')}</small>
+          )}
+          {insight.texture && <small>{insight.texture}</small>}
+        </div>
+      </Html>
     </group>
   );
 });
@@ -377,6 +422,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const selectedObjectId = useStore((state) => state.selectedObjectId);
   const perspective = useStore((state) => state.perspective);
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
+  const objectLabelsEnabled = useStore((state) => state.objectLabelsEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
   const showtimeEnabled = useStore((state) => state.showtimeEnabled);
@@ -439,6 +485,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
         <ImportedPhysicsScene
           sceneObjects={renderableSceneObjects}
           selectedObjectId={selectedObjectId}
+          objectLabelsEnabled={objectLabelsEnabled}
           onDragStateChange={setIsTransforming}
         />
       )}

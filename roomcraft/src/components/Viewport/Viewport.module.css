@@ -219,6 +219,47 @@
   object-fit: cover;
 }
 
+.objectInsightLabel {
+  min-width: 132px;
+  max-width: 180px;
+  padding: 6px 8px;
+  border: 1px solid rgba(45, 212, 191, 0.78);
+  border-radius: 5px;
+  background: rgba(12, 18, 22, 0.88);
+  color: #eefefa;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+  font-family: var(--font-ui);
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+
+.objectInsightLabel strong,
+.objectInsightLabel span,
+.objectInsightLabel small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.objectInsightLabel strong {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.objectInsightLabel span {
+  color: #2dd4bf;
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.objectInsightLabel small {
+  color: rgba(238, 254, 250, 0.72);
+  font-size: 9px;
+  margin-top: 2px;
+}
+
 .showtimeOverlay {
   position: absolute;
   right: var(--space-md);

@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Grid3x3,
+  Info,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -39,6 +40,8 @@ export default function Viewport() {
     setPerspective,
     overlaysEnabled,
     toggleOverlays,
+    objectLabelsEnabled,
+    setObjectLabelsEnabled,
     gravityEnabled,
     setGravityEnabled,
     collisionsEnabled,
@@ -164,6 +167,14 @@ export default function Viewport() {
           onClick={toggleOverlays}
         >
           <Grid3x3 size={12} /> Overlays
+        </button>
+
+        <button
+          className={`${styles.toolbarBtn} ${objectLabelsEnabled ? styles.active : ''}`}
+          onClick={() => setObjectLabelsEnabled(!objectLabelsEnabled)}
+          aria-pressed={objectLabelsEnabled}
+        >
+          <Info size={12} /> AI Labels
         </button>
 
         <button

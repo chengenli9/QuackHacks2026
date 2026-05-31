@@ -56,6 +56,7 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
     highlightedObjectId: 'duck_01',
     gravityEnabled: true,
     collisionsEnabled: false,
+    objectLabelsEnabled: true,
     viewMode: 'wireframe',
     perspective: 'Top',
     sceneObjects: [object()],
@@ -78,6 +79,7 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.project.currentView, 'editor');
   assert.equal(snapshot.project.gravityEnabled, true);
   assert.equal(snapshot.project.collisionsEnabled, false);
+  assert.equal(snapshot.project.objectLabelsEnabled, true);
   assert.equal(snapshot.project.viewMode, 'wireframe');
   assert.equal(snapshot.project.perspective, 'Top');
   assert.equal(snapshot.project.highlightedObjectId, undefined);
@@ -130,11 +132,13 @@ test('hydrateProjectSnapshot defaults newly added viewport fields for older save
     assetSources: [],
   });
   delete snapshot.project.floorEnabled;
+  delete snapshot.project.objectLabelsEnabled;
   delete snapshot.project.backgroundGallery;
 
   const state = hydrateProjectSnapshot(snapshot);
 
   assert.equal(state.floorEnabled, true);
+  assert.equal(state.objectLabelsEnabled, false);
   assert.deepEqual(state.backgroundGallery, []);
   assert.deepEqual(state.sceneObjects[0].localBoundsCenter, [0, 0, 0]);
   assert.deepEqual(state.sceneObjects[0].localBoundsDimensions, [0.4, 0.3, 0.5]);
