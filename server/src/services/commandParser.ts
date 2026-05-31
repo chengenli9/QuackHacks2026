@@ -157,13 +157,37 @@ export const buildCommandResponse = async (input: CommandRequest) => {
   } catch (error) {
     if (error instanceof HttpError && error.code === "UnsupportedCommand") {
       return commandResponseSchema.parse({
-        message:
-          "I can chat about the scene and use editor tools when you ask me to change it: add objects, move or resize them, edit physics/materials, toggle gravity/collisions, generate backgrounds, create environment scenes, and export."
+        message: conversationalFallbackMessage(input)
       });
     }
     throw error;
   }
 };
+
+function conversationalFallbackMessage(input: CommandRequest) {
+  const request = commandRequestSchema.parse(input);
+  const objectCount = request.sceneContext.objects.length;
+  const selectedObject = request.sceneContext.objects.find(
+    (object) => object.id === request.sceneContext.selectedObjectId
+  );
+
+  if (/\b(what can you do|help|capabilities|how do you work)\b/i.test(request.message)) {
+    const sceneSummary = objectCount
+      ? `This scene has ${objectCount} object${objectCount === 1 ? "" : "s"}${selectedObject ? `, with ${selectedObject.label} selected` : ""}.`
+      : "The scene is ready for imports, generated assets, physics edits, material edits, backgrounds, and exports.";
+    return `${sceneSummary} Ask for a change directly, or ask a question about the current setup.`;
+  }
+
+  if (/\b(hi|hello|hey)\b/i.test(request.message)) {
+    return selectedObject
+      ? `Hi. ${selectedObject.label} is selected; what should happen to it?`
+      : "Hi. What would you like to build or inspect in the scene?";
+  }
+
+  return selectedObject
+    ? `${selectedObject.label} is selected. Ask a follow-up question or describe the edit you want.`
+    : "Ask a question, describe a scene edit, or select an object and refer to it as this or it.";
+}
 
 const parseEnvironmentSceneCommand = (
   message: string,

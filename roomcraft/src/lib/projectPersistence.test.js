@@ -344,6 +344,32 @@ test('primary project storage requires the authoritative save and mirrors best-e
   assert.deepEqual(await readSavedProject(primary), snapshot);
 });
 
+test('primary project storage still saves to the mirror when remote save fails', async () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    projectId: 'offline-project',
+    projectName: 'Offline Project',
+    sceneObjects: [object()],
+  });
+  const brokenPrimary = {
+    async getProject() {
+      return null;
+    },
+    async setProject() {
+      throw new Error('Failed to fetch');
+    },
+    async listProjects() {
+      return [];
+    },
+  };
+  const mirror = createMemoryProjectStorage();
+  const storage = createPrimaryProjectStorage(brokenPrimary, mirror);
+
+  await writeSavedProject(snapshot, storage, 'offline-project');
+
+  assert.deepEqual(await readSavedProject(mirror, 'offline-project'), snapshot);
+});
+
 test('primary project storage falls back to the mirror when reads or lists fail', async () => {
   const snapshot = serializeProjectState({
     currentView: 'editor',

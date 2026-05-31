@@ -180,14 +180,13 @@ describe("extended local command parser", () => {
   });
 
   it("returns conversational messages when no scene tool is needed", async () => {
-    await expect(
-      buildCommandResponse({
-        message: "what can you help me do?",
-        sceneContext
-      })
-    ).resolves.toEqual({
-      message: expect.stringContaining("I can")
+    const response = await buildCommandResponse({
+      message: "what can you help me do?",
+      sceneContext
     });
+
+    expect(response.message).toContain("scene");
+    expect(response.message).not.toContain("I can chat about the scene");
   });
 
   it("falls back to local parsing when the primary command parser fails", async () => {

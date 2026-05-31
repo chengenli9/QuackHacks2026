@@ -80,6 +80,7 @@ export default function TopBar() {
   const setProjectPickerOpen = useStore((state) => state.setProjectPickerOpen);
   const projectName = useStore((state) => state.projectName);
   const savedProjectError = useStore((state) => state.savedProjectError);
+  const setSavedProjectStatus = useStore((state) => state.setSavedProjectStatus);
   const addGlbImportWarning = useStore((state) => state.addGlbImportWarning);
 
   useEffect(() => {
@@ -109,7 +110,11 @@ export default function TopBar() {
         resetProject();
       }
     } catch (error) {
-      addGlbImportWarning(`Project action failed: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      setSavedProjectStatus('error', message);
+      if (action === 'importGlb') {
+        addGlbImportWarning(`Import failed: ${message}`);
+      }
     }
   };
 

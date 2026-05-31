@@ -14,6 +14,7 @@ import {
   toolCallLabel,
   visibleThoughtsFromCommandResponse,
 } from '../../lib/agentCommandResponse';
+import { nextChatMessageIdBase } from '../../lib/chatMessageIds';
 import { fallbackPromptForAssetKey } from '../../lib/fallbackAssets';
 import { loadGlbIntoScene } from '../../lib/glbImport';
 import { createProjectAssetSource } from '../../lib/projectPersistence';
@@ -58,6 +59,7 @@ export default function ChatPanel() {
   };
 
   useEffect(() => {
+    messageIdRef.current = nextChatMessageIdBase(chatMessages, messageIdRef.current);
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
@@ -430,9 +432,9 @@ export default function ChatPanel() {
   return (
     <div className={styles.chatPanel}>
       <div className={styles.chatMessages}>
-        {chatMessages.map((msg) => (
+        {chatMessages.map((msg, index) => (
           <div
-            key={msg.id}
+            key={`${msg.id ?? 'message'}-${index}`}
             className={`${styles.messageBubble} ${styles[msg.sender]} ${msg.kind ? styles[msg.kind] : ''} ${msg.typing ? styles.typing : ''}`}
           >
             {msg.sender === 'ai' && !msg.typing && (

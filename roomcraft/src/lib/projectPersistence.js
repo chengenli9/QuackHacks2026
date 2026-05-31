@@ -229,12 +229,21 @@ export function createPrimaryProjectStorage(primaryStorage, mirrorStorage) {
       }
     },
     async setProject(key, snapshot) {
-      await primaryStorage.setProject(key, snapshot);
+      let primaryError = null;
+      try {
+        await primaryStorage.setProject(key, snapshot);
+      } catch (error) {
+        primaryError = error;
+      }
+
+      let mirrorError = null;
       try {
         await mirrorStorage.setProject(key, snapshot);
-      } catch {
-        // The authoritative project was saved; local mirrors are best-effort.
+      } catch (error) {
+        mirrorError = error;
       }
+
+      if (primaryError && mirrorError) throw primaryError;
     },
     async listProjects() {
       const primaryProjects = primaryStorage.listProjects
