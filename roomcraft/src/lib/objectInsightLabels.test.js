@@ -62,3 +62,8 @@ test('shouldShowObjectInsightLabel respects global toggle and generic scene node
   assert.equal(shouldShowObjectInsightLabel(DUCK, false), false);
   assert.equal(shouldShowObjectInsightLabel({ id: 'Room_Mesh', label: 'Room_Mesh' }, true), false);
 });
+
+test('shouldShowObjectInsightLabel still displays the default merged imported GLB object', () => {
+  assert.equal(shouldShowObjectInsightLabel({ id: 'imported_glb_01', label: 'Imported GLB' }, true), true);
+  assert.equal(shouldShowObjectInsightLabel({ id: 'imported_glb', label: 'imported_glb' }, true), true);
+});

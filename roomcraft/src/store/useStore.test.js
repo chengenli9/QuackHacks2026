@@ -58,6 +58,9 @@ test('scene object editor actions update transform, material, physics, and gravi
   useStore.setState({
     selectedObjectId: 'duck_01',
     gravityEnabled: false,
+    sceneObjectTransforms: {
+      duck_01: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+    },
     sceneObjects: [
       {
         id: 'duck_01',
@@ -79,11 +82,61 @@ test('scene object editor actions update transform, material, physics, and gravi
   const state = useStore.getState();
   const object = state.sceneObjects[0];
   assert.deepEqual(object.transform.position, [1, 2, 3]);
+  assert.deepEqual(state.sceneObjectTransforms.duck_01.position, [1, 2, 3]);
   assert.equal(object.transformRevision, 1);
   assert.equal(object.appearance.baseColor, '#ffcc00');
   assert.equal(object.physics.restitution, 0.85);
   assert.equal(object.physicsRevision, 1);
   assert.equal(state.gravityEnabled, true);
+});
+
+test('ai transform operations update the same transform state as manual property edits', () => {
+  useStore.setState({
+    selectedObjectId: 'duck_01',
+    sceneObjectTransforms: {
+      duck_01: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+    },
+    sceneObjects: [
+      {
+        id: 'duck_01',
+        label: 'duck',
+        transform: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        transformRevision: 0,
+        physicsRevision: 0,
+        physics: { massKg: 1, restitution: 0.2, friction: 0.5, static: false, collider: 'cuboid' },
+        appearance: { baseColor: '#8a8a8a', roughness: 0.8, metalness: 0.1 },
+      },
+    ],
+  });
+
+  useStore.getState().applySceneOperation({
+    action: 'move_object',
+    target: 'duck_01',
+    position: [3, 4, 5],
+  });
+  useStore.getState().applySceneOperation({
+    action: 'rotate_object',
+    target: 'duck_01',
+    rotation: [0, 1.57, 0],
+  });
+  useStore.getState().applySceneOperation({
+    action: 'scale_object',
+    target: 'duck_01',
+    scale: [2, 2, 2],
+  });
+
+  const state = useStore.getState();
+  const object = state.sceneObjects[0];
+  assert.deepEqual(object.transform.position, [3, 4, 5]);
+  assert.deepEqual(object.transform.rotation, [0, 1.57, 0]);
+  assert.deepEqual(object.transform.scale, [2, 2, 2]);
+  assert.deepEqual(state.sceneObjectTransforms.duck_01, {
+    position: [3, 4, 5],
+    rotation: [0, 1.57, 0],
+    scale: [2, 2, 2],
+  });
+  assert.equal(object.transformRevision, 3);
+  assert.equal(state.selectedObjectId, 'duck_01');
 });
 
 test('project reset clears imported and generated demo state without leaving editor', () => {

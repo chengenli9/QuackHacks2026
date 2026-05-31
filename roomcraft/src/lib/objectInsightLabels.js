@@ -1,4 +1,5 @@
-const GENERIC_LABELS = new Set(['room_mesh', 'scene', 'imported_glb']);
+// Keep merged demo imports visible even when the GLB loader can only expose "Imported GLB".
+const GENERIC_LABELS = new Set(['room_mesh', 'scene']);
 
 export function buildObjectInsightLabel(object = {}) {
   const physics = object.physics ?? {};

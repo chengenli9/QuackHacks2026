@@ -171,6 +171,9 @@ export function applySceneOperationToState(state, operation) {
         sceneObjects: updateObjectTransform(state.sceneObjects, operation.target, {
           position: operation.position,
         }),
+        sceneObjectTransforms: updateSceneObjectTransformMap(state.sceneObjectTransforms, operation.target, {
+          position: operation.position,
+        }),
         selectedObjectId: operation.target,
       };
     case 'rotate_object':
@@ -178,11 +181,17 @@ export function applySceneOperationToState(state, operation) {
         sceneObjects: updateObjectTransform(state.sceneObjects, operation.target, {
           rotation: operation.rotation,
         }),
+        sceneObjectTransforms: updateSceneObjectTransformMap(state.sceneObjectTransforms, operation.target, {
+          rotation: operation.rotation,
+        }),
         selectedObjectId: operation.target,
       };
     case 'scale_object':
       return {
         sceneObjects: updateObjectTransform(state.sceneObjects, operation.target, {
+          scale: operation.scale,
+        }),
+        sceneObjectTransforms: updateSceneObjectTransformMap(state.sceneObjectTransforms, operation.target, {
           scale: operation.scale,
         }),
         selectedObjectId: operation.target,
@@ -228,4 +237,20 @@ export function applySceneOperationToState(state, operation) {
     default:
       return {};
   }
+}
+
+function updateSceneObjectTransformMap(sceneObjectTransforms = {}, objectId, patch) {
+  const current = sceneObjectTransforms[objectId] ?? {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  };
+  return {
+    ...sceneObjectTransforms,
+    [objectId]: {
+      position: patch.position ? [...patch.position] : current.position,
+      rotation: patch.rotation ? [...patch.rotation] : current.rotation,
+      scale: patch.scale ? [...patch.scale] : current.scale,
+    },
+  };
 }
