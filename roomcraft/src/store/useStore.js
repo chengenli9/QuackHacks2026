@@ -13,6 +13,19 @@ const DEFAULT_CHAT_MESSAGES = [
   { id: 1, sender: 'ai', text: 'Import a GLB scene, then ask me to edit objects or add generated assets.' },
 ];
 
+const DEFAULT_TRANSFORMS = {
+  Room_Mesh: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Floor: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Walls: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Ceiling: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Lights: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Ambient: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Sun: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Camera: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Scene: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  ChaoMan: { position: [0, 0.85, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+};
+
 const resettableProjectState = () => ({
   leftPanelTab: 'import',
   chatSubTab: 'prompt',
@@ -25,6 +38,7 @@ const resettableProjectState = () => ({
   exportRequestedAt: null,
   selectedObjectId: 'Room_Mesh',
   expandedNodes: ['Scene', 'Room_Mesh', 'Lights'],
+  sceneObjectTransforms: { ...DEFAULT_TRANSFORMS },
   glbImportRequestId: 0,
   importedGlbFileName: null,
   glbImportStatus: 'idle',
@@ -41,6 +55,35 @@ const resettableProjectState = () => ({
   sourceImageUrl: null,
   chatMessages: DEFAULT_CHAT_MESSAGES,
 });
+
+function transformMapForObjects(objects) {
+  return Object.fromEntries(
+    objects.map((object) => [
+      object.id,
+      {
+        position: [...(object.transform?.position ?? object.center ?? [0, 0, 0])],
+        rotation: [...(object.transform?.rotation ?? [0, 0, 0])],
+        scale: [...(object.transform?.scale ?? [1, 1, 1])],
+      },
+    ])
+  );
+}
+
+function updateTransformMap(sceneObjectTransforms, id, partial) {
+  const current = sceneObjectTransforms[id] || {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    scale: [1, 1, 1],
+  };
+  return {
+    ...sceneObjectTransforms,
+    [id]: {
+      position: partial.position ? [...partial.position] : current.position,
+      rotation: partial.rotation ? [...partial.rotation] : current.rotation,
+      scale: partial.scale ? [...partial.scale] : current.scale,
+    },
+  };
+}
 
 const useStore = create((set) => ({
   // App navigation
@@ -73,6 +116,31 @@ const useStore = create((set) => ({
         : [...state.expandedNodes, id],
     })),
 
+  // Compatibility with main's transient transform map. Scene objects remain authoritative.
+  initObjectTransform: (id, position, rotation, scale) =>
+    set((state) => {
+      if (state.sceneObjectTransforms[id]) return state;
+      return {
+        sceneObjectTransforms: {
+          ...state.sceneObjectTransforms,
+          [id]: { position, rotation, scale },
+        },
+      };
+    }),
+  updateObjectTransform: (id, partial) =>
+    set((state) => ({
+      sceneObjectTransforms: updateTransformMap(state.sceneObjectTransforms, id, partial),
+      sceneObjects: updateObjectTransform(state.sceneObjects, id, partial),
+    })),
+  batchInitObjectTransforms: (entries) =>
+    set((state) => {
+      const next = { ...state.sceneObjectTransforms };
+      for (const [id, transform] of Object.entries(entries)) {
+        if (!next[id]) next[id] = transform;
+      }
+      return { sceneObjectTransforms: next };
+    }),
+
   // Imported GLB scene
   requestGlbImport: () =>
     set((state) => ({
@@ -85,27 +153,41 @@ const useStore = create((set) => ({
   addGlbImportWarning: (warning) =>
     set((state) => ({ glbImportWarnings: [...state.glbImportWarnings, warning] })),
   setImportedScene: ({ fileName, objects, warnings = [] }) =>
-    set((state) => ({
-      importedGlbFileName: fileName,
-      sceneObjects: objects.map(normalizeSceneObject),
-      glbImportStatus: 'ready',
-      glbImportError: null,
-      glbImportWarnings: warnings,
-      selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
-      highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
-      expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
-    })),
+    set((state) => {
+      const normalizedObjects = objects.map(normalizeSceneObject);
+      return {
+        importedGlbFileName: fileName,
+        sceneObjects: normalizedObjects,
+        glbImportStatus: 'ready',
+        glbImportError: null,
+        glbImportWarnings: warnings,
+        selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+        highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
+        expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+        sceneObjectTransforms: {
+          ...state.sceneObjectTransforms,
+          ...transformMapForObjects(normalizedObjects),
+        },
+      };
+    }),
   addImportedScene: ({ fileName, objects, warnings = [] }) =>
-    set((state) => ({
-      importedGlbFileName: fileName,
-      sceneObjects: [...state.sceneObjects, ...objects.map(normalizeSceneObject)],
-      glbImportStatus: 'ready',
-      glbImportError: null,
-      glbImportWarnings: [...state.glbImportWarnings, ...warnings],
-      selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
-      highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
-      expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
-    })),
+    set((state) => {
+      const normalizedObjects = objects.map(normalizeSceneObject);
+      return {
+        importedGlbFileName: fileName,
+        sceneObjects: [...state.sceneObjects, ...normalizedObjects],
+        glbImportStatus: 'ready',
+        glbImportError: null,
+        glbImportWarnings: [...state.glbImportWarnings, ...warnings],
+        selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+        highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
+        expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+        sceneObjectTransforms: {
+          ...state.sceneObjectTransforms,
+          ...transformMapForObjects(normalizedObjects),
+        },
+      };
+    }),
   mergeManifestMetadata: ({ fileName, manifest }) =>
     set((state) => {
       const result = applyManifestToSceneObjects(state.sceneObjects, manifest);
@@ -129,10 +211,12 @@ const useStore = create((set) => ({
   updateSceneObjectTransform: (objectId, patch) =>
     set((state) => ({
       sceneObjects: updateObjectTransform(state.sceneObjects, objectId, patch),
+      sceneObjectTransforms: updateTransformMap(state.sceneObjectTransforms, objectId, patch),
     })),
   setSceneObjectRuntimeTransform: (objectId, patch) =>
     set((state) => ({
       sceneObjects: updateObjectTransform(state.sceneObjects, objectId, patch, { runtime: true }),
+      sceneObjectTransforms: updateTransformMap(state.sceneObjectTransforms, objectId, patch),
     })),
   updateSceneObjectAppearance: (objectId, patch) =>
     set((state) => ({

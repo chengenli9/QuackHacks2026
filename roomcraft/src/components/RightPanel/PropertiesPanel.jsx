@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import useStore from '../../store/useStore';
 import styles from './RightPanel.module.css';
 
@@ -11,11 +12,13 @@ const OBJECT_DATA = {
   Ambient: { verts: null, polys: null, format: null, color: '#ffeeaa' },
   Sun: { verts: null, polys: null, format: null, color: '#ffffff' },
   Camera: { verts: null, polys: null, format: null, color: '#4499ff' },
+  ChaoMan: { verts: null, polys: null, format: '.glb', color: '#8a8a8a' },
 };
 
 const DEFAULT_DATA = { verts: '-', polys: '-', format: '-', color: '#888888' };
 const BODY_TYPES = ['Dynamic', 'Fixed'];
 const COLLIDERS = ['cuboid', 'ball', 'cylinder', 'convex_hull'];
+const AXIS_COLORS = { X: '#e8524a', Y: '#6abf69', Z: '#4d9de0' };
 
 function formatNumber(value) {
   return Number.isFinite(value) ? value.toLocaleString() : '-';
@@ -30,29 +33,52 @@ function parseNumber(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function XYZRow({ label, values, onChange, disabled = false }) {
+function EditableXYZRow({ label, values, onCommit, disabled = false }) {
+  const [editing, setEditing] = useState({ X: false, Y: false, Z: false });
+  const [draft, setDraft] = useState({ X: '', Y: '', Z: '' });
+
+  const beginEdit = useCallback((axis, currentValue) => {
+    if (disabled) return;
+    setEditing((prev) => ({ ...prev, [axis]: true }));
+    setDraft((prev) => ({ ...prev, [axis]: formatFixed(currentValue) }));
+  }, [disabled]);
+
+  const finishEdit = useCallback((axis) => {
+    setEditing((prev) => ({ ...prev, [axis]: false }));
+    const parsed = Number.parseFloat(draft[axis]);
+    if (!Number.isFinite(parsed)) return;
+    const next = [...values];
+    const index = axis === 'X' ? 0 : axis === 'Y' ? 1 : 2;
+    next[index] = parsed;
+    onCommit(next);
+  }, [draft, onCommit, values]);
+
+  const handleKeyDown = useCallback((axis, event) => {
+    if (event.key === 'Enter') {
+      event.target.blur();
+    } else if (event.key === 'Escape') {
+      setEditing((prev) => ({ ...prev, [axis]: false }));
+    }
+  }, []);
+
   return (
     <div className={styles.transformRow}>
       <span className={styles.transformLabel}>{label}</span>
       <div className={styles.xyzRow} style={{ flex: 1 }}>
         {['X', 'Y', 'Z'].map((axis, index) => (
           <div key={axis} style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 2 }}>
-            <span
-              className={styles.xyzLabel}
-              style={{ color: axis === 'X' ? '#e8524a' : axis === 'Y' ? '#6abf69' : '#4d9de0' }}
-            >
+            <span className={styles.xyzLabel} style={{ color: AXIS_COLORS[axis] }}>
               {axis}
             </span>
             <input
               className={styles.xyzInput}
-              value={formatFixed(values[index])}
+              value={editing[axis] ? draft[axis] : formatFixed(values[index])}
               disabled={disabled}
               aria-label={`${label} ${axis}`}
-              onChange={(event) => {
-                const next = [...values];
-                next[index] = parseNumber(event.target.value, values[index]);
-                onChange(next);
-              }}
+              onFocus={() => beginEdit(axis, values[index])}
+              onChange={(event) => setDraft((prev) => ({ ...prev, [axis]: event.target.value }))}
+              onBlur={() => finishEdit(axis)}
+              onKeyDown={(event) => handleKeyDown(axis, event)}
             />
           </div>
         ))}
@@ -216,6 +242,16 @@ export default function PropertiesPanel() {
   const displayBaseColor = appearance.baseColor ?? data.color ?? '#8a8a8a';
   const disabled = !selectedSceneObject;
 
+  const commitPosition = useCallback((position) => {
+    if (selectedSceneObject) updateSceneObjectTransform(selectedSceneObject.id, { position });
+  }, [selectedSceneObject, updateSceneObjectTransform]);
+  const commitRotation = useCallback((rotation) => {
+    if (selectedSceneObject) updateSceneObjectTransform(selectedSceneObject.id, { rotation });
+  }, [selectedSceneObject, updateSceneObjectTransform]);
+  const commitScale = useCallback((scale) => {
+    if (selectedSceneObject) updateSceneObjectTransform(selectedSceneObject.id, { scale });
+  }, [selectedSceneObject, updateSceneObjectTransform]);
+
   return (
     <div className={styles.propertiesPanel}>
       <div className="panel-header">
@@ -228,24 +264,9 @@ export default function PropertiesPanel() {
       <div className={styles.transformScroll}>
         <div className={styles.propSection}>
           <div className={styles.propSectionHeader}>Transform</div>
-          <XYZRow
-            label="Location"
-            values={transform.position}
-            disabled={disabled}
-            onChange={(position) => updateSceneObjectTransform(selectedSceneObject.id, { position })}
-          />
-          <XYZRow
-            label="Rotation"
-            values={transform.rotation}
-            disabled={disabled}
-            onChange={(rotation) => updateSceneObjectTransform(selectedSceneObject.id, { rotation })}
-          />
-          <XYZRow
-            label="Scale"
-            values={transform.scale}
-            disabled={disabled}
-            onChange={(scale) => updateSceneObjectTransform(selectedSceneObject.id, { scale })}
-          />
+          <EditableXYZRow label="Location" values={transform.position} disabled={disabled} onCommit={commitPosition} />
+          <EditableXYZRow label="Rotation" values={transform.rotation} disabled={disabled} onCommit={commitRotation} />
+          <EditableXYZRow label="Scale" values={transform.scale} disabled={disabled} onCommit={commitScale} />
         </div>
       </div>
 
