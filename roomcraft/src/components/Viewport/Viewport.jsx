@@ -25,7 +25,6 @@ export default function Viewport() {
   const frameRef = useRef(null);
 
   const handleCameraUpdate = useCallback((pos) => {
-    if (frameRef.current) cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(() => {
       setCamPos({ x: pos.x, y: pos.y, z: pos.z });
       setInputVals(prev => {
