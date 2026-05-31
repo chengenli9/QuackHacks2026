@@ -131,6 +131,7 @@ function ImportedSceneObject({
   const setSelectedObject = useStore((state) => state.setSelectedObject);
   const updateSceneObjectTransform = useStore((state) => state.updateSceneObjectTransform);
   const setSceneObjectRuntimeTransform = useStore((state) => state.setSceneObjectRuntimeTransform);
+  const { camera } = useThree();
 
   useEffect(() => {
     if (!object.object3d) return;
@@ -147,6 +148,10 @@ function ImportedSceneObject({
     }
     if (labelRef.current) {
       labelRef.current.position.set(translation.x, translation.y, translation.z);
+
+      const cameraDistance = new Vector3(translation.x, translation.y, translation.z).distanceTo(camera.position);
+      const zoomScale = Math.min(1, Math.max(0.42, cameraDistance / 12));
+      labelRef.current.scale.setScalar(zoomScale);
     }
   };
 
@@ -421,9 +426,9 @@ const ObjectInsightLabel = forwardRef(function ObjectInsightLabel({ object }, re
   ];
 
   return (
-    <group ref={ref} position={objectPosition}>
-      <Html center position={localPosition} distanceFactor={9} occlude>
-        <div className={styles.objectInsightLabel}>
+        <group ref={ref} position={objectPosition}>
+          <Html center position={localPosition} distanceFactor={7} occlude>
+            <div className={styles.objectInsightLabel}>
           <strong>{insight.title}</strong>
           <span>{insight.subtitle}</span>
           {insight.metrics.length > 0 && (
