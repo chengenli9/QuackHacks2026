@@ -1,6 +1,6 @@
 # Scene-to-3D Physics Sandbox: 24h Hackathon Build Plan
 
-Updated: 2026-05-30
+Updated: 2026-05-31
 
 ## Final Directive
 
@@ -73,14 +73,15 @@ Frontend:
 
 - React
 - Vite
-- TypeScript
+- JavaScript/JSX
 - Three.js
 - React Three Fiber
 - `@react-three/drei`
 - `@react-three/rapier`
 - Zustand
-- immer
-- Zod
+- Lucide React
+- React Dropzone
+- ESLint
 - GLTFLoader
 - GLTFExporter
 
@@ -94,11 +95,13 @@ Backend:
 - OpenAI or Gemini provider adapter
 - Local filesystem storage
 
+Current stack note: the frontend is intentionally JavaScript/JSX for this pass. It does not use frontend TypeScript, immer, or Zod; backend API and model-output validation use TypeScript plus Zod.
+
 ## Meshy Priority
 
 Meshy is required for the live demo path. The MVP should implement `/api/generate-asset` so the backend can start a Meshy task from a text prompt.
 
-Meshy text-to-3D currently uses a preview/refine workflow. The MVP should generate an untextured preview mesh first and only add refine/texturing if time allows. Meshy also supports GLB output, which fits the Three.js import pipeline.
+Meshy text-to-3D uses a preview/refine workflow. The current backend requests GLB output, starts with a preview task, refines the result with PBR/HD texture options, caches the returned model locally, and serves it through the backend so the frontend imports a stable project-owned URL.
 
 Local GLBs are fallback assets only. They keep the demo stable when Meshy is slow, unavailable, rate-limited, or returns a bad model.
 

@@ -1,127 +1,63 @@
 # Implementation Roadmap
 
-Updated: 2026-05-30
+Updated: 2026-05-31
 
-## 1. GLB Editor Foundation
+## Current Architecture Baseline
 
-Build the import-first editor:
+The app is split into:
 
-- React/Vite/TypeScript app.
-- R3F viewport with camera controls, lighting, and grid/floor.
+- `roomcraft`: React/Vite JavaScript frontend with Three.js, React Three Fiber, Drei, Rapier, Zustand, Lucide, React Dropzone, and ESLint.
+- `server`: Fastify/TypeScript backend with Zod validation, Vitest tests, Meshy/Gemini/OpenAI/local providers, generated asset cache, fallback asset serving, and project persistence.
+
+The frontend is not currently TypeScript and does not use immer or frontend Zod. Backend API/model validation is Zod-based.
+
+## Completed Foundation
+
 - GLB import through GLTFLoader.
-- Optional `manifest.json` import.
-- Object registry with stable app-level IDs.
-- Selection, transform controls, and object inspector.
-- Zustand store with Zod-validated scene data.
+- Optional `manifest.json` metadata import.
+- Stable app-level object IDs and object registry.
+- Outliner/viewport selection.
+- Transform controls and property-panel transform edits.
+- Material, wireframe, and solid view modes.
+- Editable appearance and physics properties.
+- Zustand project/scene store.
+- Rapier gravity/collisions/floor runtime.
+- Editor-authoritative dragging, including gravity-on release behavior.
+- Export of `scene.glb` and `scene.physics.json`.
 
-## 2. Rapier Physics
+## AI And Chat Editing
 
-Add runtime physics:
+- `/api/command` returns validated `operation`, `operations[]`, or conversational `message`.
+- Gemini is the primary configured chat parser when `GEMINI_API_KEY` exists.
+- Deterministic local parser handles no-key demo flows and multi-operation edits.
+- Chat supports visible plan/thought lines and ordered tool-call status bubbles.
+- Supported operations include generated/local object insertion, transforms, physics edits, appearance edits, gravity/collision toggles, export, relabel, background generation, and environment-scene generation.
 
-- Gravity toggle.
-- Rigid body registration.
-- Simplified colliders.
-- Drag/release behavior.
-- Editable physics profiles.
-- Local normalization from semantic metadata into collider, mass, friction, and restitution.
+## Meshy And Generated Assets
 
-## 3. Chat Operations
+- `/api/generate-asset` starts Meshy text-to-3D generation.
+- Meshy provider uses preview then refine flow with PBR/HD texture options.
+- `/api/generated-assets/:id/status` normalizes preview/refine status and progress.
+- `/api/generated-assets/:id/model` returns generated metadata after GLB caching.
+- `/api/generated-assets/:id/model.glb` streams cached generated GLBs.
+- Frontend shows placeholders/task state, imports generated GLBs, registers objects, and selects/highlights inserted objects.
 
-Implement safe scene editing through structured operations:
+## Fallbacks, VLM, Backgrounds, And Projects
 
-- `/api/command`.
-- `SceneOperation` schemas.
-- Zod validation.
-- Operation dispatcher.
-- Commands for gravity, movement, physics edits, deletion, export, and generated asset insertion.
+- Local fallback assets are served explicitly through `/assets/fallback/:file` and `/api/generated-assets/fallback`.
+- Object semantic/physics/appearance estimation uses Gemini when configured, local rules without keys, and OpenAI as secondary object-estimator fallback.
+- Gemini background generation is exposed through `/api/background-image`.
+- Named project save/open persists project JSON, bundled GLB assets, generated backgrounds, chat context, and editor settings under `PROJECT_STORAGE_DIR`.
+- Browser local storage/IndexedDB mirror protects against backend save/load failures.
 
-## 4. Meshy Live Generation
+## Remaining Hardening Priorities
 
-This is the first wow milestone.
-
-- `/api/generate-asset`.
-- `MeshyProvider`.
-- Generated asset status route.
-- Generated asset model route.
-- Frontend placeholder.
-- Polling loop.
-- GLB import for generated asset output.
-- Generated object registration.
-- Physics defaults for generated models.
-
-## 5. Local Fallback Insertion
-
-Add fallback only after the Meshy path exists:
-
-- Local asset library.
-- Fallback matching by asset key.
-- Explicit "Use fallback asset" UI state.
-- Same placement and physics pipeline as generated assets.
-
-## 6. VLM Semantic Estimation
-
-Estimate and normalize object metadata:
-
-- Imported object estimation.
-- Generated object estimation.
-- Provider interface for OpenAI or Gemini.
-- Future-proof interface for a local fine-tuned model.
-- Confidence display in inspector.
-
-## 7. Export
-
-Export user changes:
-
-- `scene.glb`.
-- `scene.physics.json`.
-- Object IDs.
-- Object transforms.
-- Physics profiles.
-- Generated asset source metadata.
-
-## 8. Demo Polish
-
-Prepare for judging:
-
-- Curated living-room scene.
-- Source image preview.
-- Reset button.
-- Scripted example prompts.
-- Meshy progress UI.
-- Fallback button.
-- Highlight newly inserted object.
-
-## Repo Structure Additions
-
-```text
-src/assets/
-  assetLibrary.ts
-  assetPlacement.ts
-  generatedAssetClient.ts
-
-src/components/
-  GeneratedAssetStatus.tsx
-  GeneratedAssetPlaceholder.tsx
-
-src/scene/
-  generatedAssetActions.ts
-
-server/routes/
-  generateAsset.ts
-  generatedAssetStatus.ts
-  generatedAssetModel.ts
-
-server/providers/
-  AssetGenerator.ts
-  MeshyProvider.ts
-  LocalAssetProvider.ts
-
-server/services/
-  assetGenerationService.ts
-  generatedAssetCache.ts
-  meshyTaskStore.ts
-```
+1. Curate and document a stable demo GLB plus matching source image.
+2. Add more manual QA coverage for large saved projects and repeated open/import cycles.
+3. Improve generated asset progress UX if Meshy exposes richer status.
+4. Add docs/examples for manifest authoring and SceneGen export naming.
+5. Consider frontend TypeScript migration only after demo-critical behavior is stable.
 
 ## Milestone Definition
 
-The MVP is demo-ready when a user can import a curated `scene.glb`, select and drop an existing object, ask chat to add a rubber duck to the coffee table, watch Meshy generation progress, see the returned GLB placed in the scene, edit the duck's physics, and export both visual and physics artifacts.
+The MVP is demo-ready when a user can import a curated `scene.glb`, select and drag an existing object, ask chat to add a rubber duck to the coffee table, watch Meshy generation progress, see the textured GLB placed in the scene, edit the duck and other objects through multi-step chat commands, generate a background, save/reopen the project, and export both visual and physics artifacts.

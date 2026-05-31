@@ -1,6 +1,6 @@
 # QuackHacks Backend
 
-Fastify/TypeScript backend for the Scene-to-3D Physics Sandbox.
+Fastify/TypeScript backend for RoomCraft. The server owns external side effects, validates API/model data with Zod, talks to Meshy/Gemini/OpenAI providers, caches generated GLBs, serves fallback assets, and stores saved projects on disk.
 
 ## Setup
 
@@ -9,20 +9,39 @@ npm install
 cp .env.example .env
 ```
 
-Set `MESHY_API_KEY` in `.env` to enable live Meshy generation. Without a key, the server still starts and returns a clear `503` for live generation routes.
+## Environment
 
-Set `GEMINI_API_KEY` to use Gemini for chat command parsing and object-property VLM estimation. Without a Gemini key, chat uses deterministic local parsing and `/api/estimate-object` falls back to local rules. `OPENAI_API_KEY` is still supported as a secondary object estimator when Gemini is not configured.
-
-Put the Gemini key in `server/.env`:
+Set keys in `server/.env`:
 
 ```bash
-GEMINI_API_KEY=your_gemini_api_key_here
+MESHY_API_KEY=your_meshy_key
+GEMINI_API_KEY=your_gemini_key
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
 ```
 
-Put deterministic fallback GLBs in `server/public/assets/fallback` or set `FALLBACK_ASSET_DIR`.
-The required filenames are `rubber_ball.glb`, `wooden_crate.glb`, `glass_vase.glb`, `metal_barrel.glb`, and `duck.glb`.
-When a fallback file is missing, the API returns `FallbackAssetFileMissing` instead of a dead asset URL.
+Supported variables:
+
+- `HOST`: bind host, default `127.0.0.1`.
+- `PORT`: bind port, default `8787`.
+- `SERVER_PUBLIC_URL`: public base URL for cached asset/background links.
+- `MESHY_API_KEY`: enables live Meshy generation.
+- `MESHY_BASE_URL`: defaults to `https://api.meshy.ai`.
+- `GEMINI_API_KEY`: enables Gemini command parsing, object VLM estimation, and background generation.
+- `GEMINI_MODEL`: defaults to `gemini-3.5-flash`.
+- `GEMINI_IMAGE_MODEL`: defaults to `gemini-2.5-flash-image`.
+- `GEMINI_BASE_URL`: defaults to `https://generativelanguage.googleapis.com/v1beta`.
+- `OPENAI_API_KEY`: optional secondary object estimator when Gemini is not configured.
+- `OPENAI_MODEL`: defaults to `gpt-4.1-mini`.
+- `OPENAI_BASE_URL`: defaults to `https://api.openai.com/v1`.
+- `GENERATED_ASSET_STORAGE_DIR`: default `storage/generated-assets`.
+- `FALLBACK_ASSET_DIR`: default `public/assets/fallback`.
+- `PROJECT_STORAGE_DIR`: default `storage/projects`.
+- `REQUEST_BODY_LIMIT_BYTES`: default `104857600`.
+
+Without `MESHY_API_KEY`, live generation routes return clear unavailable errors. Without `GEMINI_API_KEY`, chat uses deterministic local parsing, object estimation uses local rules unless OpenAI is configured, and background generation returns a clear unavailable error.
+
+Put deterministic fallback GLBs in `server/public/assets/fallback` or set `FALLBACK_ASSET_DIR`. Required filenames are `rubber_ball.glb`, `wooden_crate.glb`, `glass_vase.glb`, `metal_barrel.glb`, and `duck.glb`. Missing fallback files return `FallbackAssetFileMissing`.
 
 ## Scripts
 
@@ -30,12 +49,14 @@ When a fallback file is missing, the API returns `FallbackAssetFileMissing` inst
 npm run dev
 npm test
 npm run build
+npm start
 ```
 
 ## Endpoints
 
 - `GET /health`
 - `POST /api/command`
+- `POST /api/background-image`
 - `POST /api/estimate-object`
 - `POST /api/generate-asset`
 - `GET /api/generated-assets/:id/status`
@@ -43,5 +64,12 @@ npm run build
 - `GET /api/generated-assets/:id/model.glb`
 - `POST /api/generated-assets/fallback`
 - `GET /assets/fallback/:file`
+- `GET /api/projects`
+- `GET /api/projects/last`
+- `GET /api/projects/:projectId`
+- `PUT /api/projects/last`
+- `PUT /api/projects/:projectId`
+- `GET /api/projects/:projectId/assets/:file`
+- `GET /api/projects/:projectId/backgrounds/:file`
 
-Generated asset metadata and proxied Meshy GLBs are persisted under `GENERATED_ASSET_STORAGE_DIR`, which defaults to `storage/generated-assets`.
+Generated asset metadata and proxied Meshy GLBs are persisted under `GENERATED_ASSET_STORAGE_DIR`. Saved projects are persisted under `PROJECT_STORAGE_DIR`, with project assets and generated backgrounds bundled into each project folder.
