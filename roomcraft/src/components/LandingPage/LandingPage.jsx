@@ -1,19 +1,23 @@
+import { useEffect } from 'react';
 import { Hexagon, FolderOpen, Plus } from 'lucide-react';
 import useStore from '../../store/useStore';
+import { openSavedProjectFromStorage } from '../../lib/projectSession';
 import styles from './LandingPage.module.css';
 
 export default function LandingPage() {
   const setCurrentView = useStore((s) => s.setCurrentView);
   const resetProject = useStore((s) => s.resetProject);
-  const requestOpenSavedProject = useStore((s) => s.requestOpenSavedProject);
+  const loadProjectList = useStore((s) => s.loadProjectList);
+  const availableProjects = useStore((s) => s.availableProjects);
+  const savedProjectStatus = useStore((s) => s.savedProjectStatus);
   const createProject = () => {
     resetProject();
     setCurrentView('editor');
   };
-  const loadSavedProject = () => {
-    window.roomcraftOpenProjectRequested = true;
-    requestOpenSavedProject();
-  };
+
+  useEffect(() => {
+    void loadProjectList();
+  }, [loadProjectList]);
 
   return (
     <div className={styles.landing}>
@@ -28,7 +32,7 @@ export default function LandingPage() {
       <div className={styles.actions}>
         <button
           className={styles.card}
-          onClick={loadSavedProject}
+          onClick={createProject}
         >
           <div className={styles.cardIcon}>
             <Plus size={24} strokeWidth={1.5} />
@@ -41,7 +45,7 @@ export default function LandingPage() {
 
         <button
           className={styles.card}
-          onClick={createProject}
+          onClick={() => void loadProjectList()}
         >
           <div className={styles.cardIcon}>
             <FolderOpen size={24} strokeWidth={1.5} />
@@ -51,6 +55,32 @@ export default function LandingPage() {
             Continue working on an existing project
           </div>
         </button>
+      </div>
+
+      <div className={styles.projectList}>
+        <div className={styles.projectListHeader}>Saved Projects</div>
+        {availableProjects.length > 0 ? (
+          availableProjects.map((project) => (
+            <button
+              key={project.id}
+              className={styles.projectRow}
+              onClick={async () => {
+                setCurrentView('editor');
+                await openSavedProjectFromStorage(undefined, project.id);
+              }}
+            >
+              <span>{project.name}</span>
+              <small>
+                {project.objectCount ?? 0} objects
+                {project.savedAt ? ` - ${new Date(project.savedAt).toLocaleString()}` : ''}
+              </small>
+            </button>
+          ))
+        ) : (
+          <div className={styles.emptyProjects}>
+            {savedProjectStatus === 'error' ? 'Could not load projects.' : 'No saved projects yet.'}
+          </div>
+        )}
       </div>
 
       <footer className={styles.footer}>

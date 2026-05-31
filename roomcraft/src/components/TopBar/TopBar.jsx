@@ -10,6 +10,7 @@ const MENUS = {
     { label: 'New Scene', action: 'resetProject' },
     { label: 'Open...', action: 'openProject' },
     { label: 'Save', action: 'saveProject' },
+    { label: 'Save As...', action: 'saveProjectAs' },
     '---',
     { label: 'Import .glb', action: 'importGlb' },
     { label: 'Export Scene', action: 'exportScene' },
@@ -72,7 +73,18 @@ export default function TopBar() {
   const requestGlbImport = useStore((state) => state.requestGlbImport);
   const resetProject = useStore((state) => state.resetProject);
   const saveProject = useStore((state) => state.saveProject);
+  const saveProjectAs = useStore((state) => state.saveProjectAs);
+  const loadProjectList = useStore((state) => state.loadProjectList);
+  const availableProjects = useStore((state) => state.availableProjects);
+  const projectPickerOpen = useStore((state) => state.projectPickerOpen);
+  const setProjectPickerOpen = useStore((state) => state.setProjectPickerOpen);
+  const projectName = useStore((state) => state.projectName);
+  const savedProjectError = useStore((state) => state.savedProjectError);
   const addGlbImportWarning = useStore((state) => state.addGlbImportWarning);
+
+  useEffect(() => {
+    if (projectPickerOpen) void loadProjectList();
+  }, [projectPickerOpen, loadProjectList]);
 
   const handleMenuAction = async (action) => {
     try {
@@ -85,8 +97,13 @@ export default function TopBar() {
       if (action === 'saveProject') {
         await saveProject();
       }
+      if (action === 'saveProjectAs') {
+        const name = window.prompt('Project name', projectName || 'RoomCraft Demo');
+        if (name?.trim()) await saveProjectAs(name.trim());
+      }
       if (action === 'openProject') {
-        await openSavedProjectFromStorage();
+        setProjectPickerOpen(true);
+        await loadProjectList();
       }
       if (action === 'resetProject') {
         resetProject();
@@ -120,6 +137,41 @@ export default function TopBar() {
         <RotateCcw size={13} />
         Reset
       </button>
+
+      {projectPickerOpen && (
+        <div className={styles.projectModalBackdrop} onMouseDown={() => setProjectPickerOpen(false)}>
+          <div className={styles.projectModal} onMouseDown={(event) => event.stopPropagation()}>
+            <div className={styles.projectModalHeader}>
+              <span>Open Project</span>
+              <button onClick={() => setProjectPickerOpen(false)}>Close</button>
+            </div>
+            <div className={styles.projectModalList}>
+              {availableProjects.length > 0 ? (
+                availableProjects.map((project) => (
+                  <button
+                    key={project.id}
+                    className={styles.projectModalRow}
+                    onClick={async () => {
+                      setProjectPickerOpen(false);
+                      await openSavedProjectFromStorage(undefined, project.id);
+                    }}
+                  >
+                    <span>{project.name}</span>
+                    <small>
+                      {project.objectCount ?? 0} objects
+                      {project.savedAt ? ` - ${new Date(project.savedAt).toLocaleString()}` : ''}
+                    </small>
+                  </button>
+                ))
+              ) : (
+                <div className={styles.projectModalEmpty}>
+                  {savedProjectError ?? 'No saved projects found.'}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

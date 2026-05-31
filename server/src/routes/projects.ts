@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createReadStream, existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { z } from "zod";
 import { HttpError } from "../errors.js";
@@ -11,20 +11,108 @@ const projectSnapshotSchema = z.object({
   project: z.record(z.string(), z.unknown())
 });
 
+const projectIdParamsSchema = z.object({
+  projectId: z.string().trim().min(1)
+});
+
 export const registerProjectRoutes = (
   app: FastifyInstance,
   projectStorageDir: string,
   publicBaseUrl = "http://localhost:8787"
 ) => {
-  const projectDir = join(projectStorageDir, "last-project");
-  const projectPath = join(projectDir, "project.json");
   const legacyProjectPath = join(projectStorageDir, "last-project.json");
-  const assetDir = join(projectDir, "assets");
-  const backgroundDir = join(projectDir, "backgrounds");
+
+  app.get("/api/projects", async () => {
+    await mkdir(projectStorageDir, { recursive: true });
+    const entries = await readdir(projectStorageDir, { withFileTypes: true });
+    const projects = [];
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const id = safeProjectId(entry.name);
+      const projectPath = pathForProject(id).projectPath;
+      try {
+        const snapshot = projectSnapshotSchema.parse(JSON.parse(await readFile(projectPath, "utf8")));
+        const project = snapshot.project as Record<string, unknown>;
+        const stats = await stat(projectPath);
+        projects.push({
+          id,
+          name: typeof project.projectName === "string" ? project.projectName : readableProjectName(id),
+          savedAt: snapshot.savedAt,
+          updatedAt: stats.mtime.toISOString(),
+          importedGlbFileName: project.importedGlbFileName ?? null,
+          objectCount: Array.isArray(project.sceneObjects) ? project.sceneObjects.length : 0
+        });
+      } catch (error) {
+        if (!isMissingFileError(error)) throw error;
+      }
+    }
+
+    return { projects: projects.sort((a, b) => b.savedAt.localeCompare(a.savedAt)) };
+  });
 
   app.get("/api/projects/last", async () => {
+    return loadProject("last-project", legacyProjectPath);
+  });
+
+  app.get<{ Params: { projectId: string } }>("/api/projects/:projectId", async (request) => {
+    const { projectId } = projectIdParamsSchema.parse(request.params);
+    return loadProject(projectId);
+  });
+
+  app.put("/api/projects/last", async (request) => {
+    return saveProject("last-project", request.body);
+  });
+
+  app.put<{ Params: { projectId: string } }>("/api/projects/:projectId", async (request) => {
+    const { projectId } = projectIdParamsSchema.parse(request.params);
+    return saveProject(projectId, request.body);
+  });
+
+  app.get<{ Params: { projectId: string; file: string } }>(
+    "/api/projects/:projectId/assets/:file",
+    async (request, reply) => {
+      const { projectId } = projectIdParamsSchema.parse(request.params);
+      const file = safeStoredFileName(request.params.file, ".glb");
+      const path = join(pathForProject(projectId).assetDir, file);
+      if (!existsSync(path)) {
+        throw new HttpError(404, "ProjectAssetNotFound", "Saved project asset was not found.");
+      }
+      return reply.type("model/gltf-binary").send(createReadStream(path));
+    }
+  );
+
+  app.get<{ Params: { projectId: string; file: string } }>(
+    "/api/projects/:projectId/backgrounds/:file",
+    async (request, reply) => {
+      const { projectId } = projectIdParamsSchema.parse(request.params);
+      const file = safeStoredFileName(request.params.file);
+      const path = join(pathForProject(projectId).backgroundDir, file);
+      if (!existsSync(path)) {
+        throw new HttpError(404, "ProjectAssetNotFound", "Saved project background was not found.");
+      }
+      return reply.type(imageMimeTypeFor(file)).send(createReadStream(path));
+    }
+  );
+
+  function pathForProject(rawProjectId: string) {
+    const projectId = safeProjectId(rawProjectId);
+    const projectDir = join(projectStorageDir, projectId);
+    return {
+      projectId,
+      projectDir,
+      projectPath: join(projectDir, "project.json"),
+      assetDir: join(projectDir, "assets"),
+      backgroundDir: join(projectDir, "backgrounds")
+    };
+  }
+
+  async function loadProject(rawProjectId: string, fallbackPath?: string) {
+    const paths = pathForProject(rawProjectId);
     try {
-      const contents = await readFileProject(projectPath, legacyProjectPath);
+      const contents = fallbackPath
+        ? await readFileProject(paths.projectPath, fallbackPath)
+        : await readFile(paths.projectPath, "utf8");
       return projectSnapshotSchema.parse(JSON.parse(contents));
     } catch (error) {
       if (isMissingFileError(error)) {
@@ -32,38 +120,22 @@ export const registerProjectRoutes = (
       }
       throw error;
     }
-  });
+  }
 
-  app.put("/api/projects/last", async (request) => {
-    const snapshot = projectSnapshotSchema.parse(request.body);
+  async function saveProject(rawProjectId: string, body: unknown) {
+    const paths = pathForProject(rawProjectId);
+    const snapshot = projectSnapshotSchema.parse(body);
     const bundled = await bundleProjectSnapshot(snapshot, {
-      projectDir,
-      assetDir,
-      backgroundDir,
+      projectId: paths.projectId,
+      projectDir: paths.projectDir,
+      assetDir: paths.assetDir,
+      backgroundDir: paths.backgroundDir,
       publicBaseUrl
     });
-    await mkdir(projectDir, { recursive: true });
-    await writeFile(projectPath, `${JSON.stringify(bundled, null, 2)}\n`, "utf8");
-    return { ok: true, savedAt: bundled.savedAt };
-  });
-
-  app.get<{ Params: { file: string } }>("/api/projects/last/assets/:file", async (request, reply) => {
-    const file = safeStoredFileName(request.params.file, ".glb");
-    const path = join(assetDir, file);
-    if (!existsSync(path)) {
-      throw new HttpError(404, "ProjectAssetNotFound", "Saved project asset was not found.");
-    }
-    return reply.type("model/gltf-binary").send(createReadStream(path));
-  });
-
-  app.get<{ Params: { file: string } }>("/api/projects/last/backgrounds/:file", async (request, reply) => {
-    const file = safeStoredFileName(request.params.file);
-    const path = join(backgroundDir, file);
-    if (!existsSync(path)) {
-      throw new HttpError(404, "ProjectAssetNotFound", "Saved project background was not found.");
-    }
-    return reply.type(imageMimeTypeFor(file)).send(createReadStream(path));
-  });
+    await mkdir(paths.projectDir, { recursive: true });
+    await writeFile(paths.projectPath, `${JSON.stringify(bundled, null, 2)}\n`, "utf8");
+    return { ok: true, projectId: paths.projectId, savedAt: bundled.savedAt };
+  }
 };
 
 async function readFileProject(projectPath: string, legacyProjectPath: string) {
@@ -78,6 +150,7 @@ async function readFileProject(projectPath: string, legacyProjectPath: string) {
 async function bundleProjectSnapshot(
   snapshot: z.infer<typeof projectSnapshotSchema>,
   options: {
+    projectId: string;
     projectDir: string;
     assetDir: string;
     backgroundDir: string;
@@ -97,7 +170,7 @@ async function bundleProjectSnapshot(
 
 async function bundleAssetSources(
   assetSources: unknown,
-  options: { assetDir: string; publicBaseUrl: string }
+  options: { projectId: string; assetDir: string; publicBaseUrl: string }
 ) {
   if (!Array.isArray(assetSources)) return assetSources;
 
@@ -118,7 +191,7 @@ async function bundleAssetSources(
       return {
         ...next,
         type: "url",
-        url: `${trimBaseUrl(options.publicBaseUrl)}/api/projects/last/assets/${fileName}`
+        url: `${trimBaseUrl(options.publicBaseUrl)}/api/projects/${options.projectId}/assets/${fileName}`
       };
     })
   );
@@ -126,7 +199,7 @@ async function bundleAssetSources(
 
 async function bundleBackgroundGallery(
   backgroundGallery: unknown,
-  options: { backgroundDir: string; publicBaseUrl: string }
+  options: { projectId: string; backgroundDir: string; publicBaseUrl: string }
 ) {
   if (!Array.isArray(backgroundGallery)) return backgroundGallery;
 
@@ -140,7 +213,7 @@ async function bundleBackgroundGallery(
 async function bundleBackground(
   background: unknown,
   fallbackId: string,
-  options: { backgroundDir: string; publicBaseUrl: string }
+  options: { projectId: string; backgroundDir: string; publicBaseUrl: string }
 ) {
   if (!isRecord(background) || typeof background.imageDataUrl !== "string") {
     return background;
@@ -158,7 +231,7 @@ async function bundleBackground(
 
   return {
     ...background,
-    imageDataUrl: `${trimBaseUrl(options.publicBaseUrl)}/api/projects/last/backgrounds/${fileName}`
+    imageDataUrl: `${trimBaseUrl(options.publicBaseUrl)}/api/projects/${options.projectId}/backgrounds/${fileName}`
   };
 }
 
@@ -192,6 +265,17 @@ function safeBaseName(value: string) {
     .replace(/[^a-z0-9_-]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 80) || "asset";
+}
+
+function safeProjectId(value: string) {
+  return safeBaseName(value) || "project";
+}
+
+function readableProjectName(projectId: string) {
+  if (projectId === "last-project") return "Last Project";
+  return projectId
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

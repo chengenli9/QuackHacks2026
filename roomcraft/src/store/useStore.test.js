@@ -14,13 +14,14 @@ test('requestGlbImport switches to the import tab and increments the import requ
   assert.equal(state.glbImportRequestId, 4);
 });
 
-test('requestOpenSavedProject enters the editor and increments the open project request token', () => {
+test('requestOpenSavedProject opens the project picker and increments the request token', () => {
   useStore.setState(useStore.getInitialState(), true);
 
   useStore.getState().requestOpenSavedProject();
 
   const state = useStore.getState();
-  assert.equal(state.currentView, 'editor');
+  assert.equal(state.currentView, 'landing');
+  assert.equal(state.projectPickerOpen, true);
   assert.equal(state.openSavedProjectRequestId, 1);
 });
 
@@ -382,6 +383,7 @@ test('project save and load round trips editor metadata without runtime object3d
   await useStore.getState().saveProject(storage);
 
   assert.equal(useStore.getState().savedProjectStatus, 'saved');
+  assert.equal(useStore.getState().projectId, 'roomcraft-demo');
 
   useStore.setState(useStore.getInitialState(), true);
   const snapshot = await useStore.getState().loadSavedProject(storage);
@@ -398,4 +400,40 @@ test('project save and load round trips editor metadata without runtime object3d
   assert.equal(state.sceneObjects[0].appearance.baseColor, '#ffcc00');
   assert.equal(state.assetSources[0].dataUrl, 'data:model/gltf-binary;base64,AAAA');
   assert.equal(state.chatMessages[0].text, 'save this project');
+});
+
+test('saveProjectAs stores a named project that appears in the project list', async () => {
+  const storage = createMemoryProjectStorage();
+  useStore.setState(useStore.getInitialState(), true);
+  useStore.setState({
+    currentView: 'editor',
+    sceneObjects: [{ id: 'table_01', label: 'table' }],
+  });
+
+  await useStore.getState().saveProjectAs('Demo Night Room', storage);
+  const projects = await useStore.getState().loadProjectList(storage);
+
+  assert.equal(useStore.getState().projectId, 'demo-night-room');
+  assert.equal(useStore.getState().projectName, 'Demo Night Room');
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].id, 'demo-night-room');
+  assert.equal(projects[0].name, 'Demo Night Room');
+  assert.equal(projects[0].objectCount, 1);
+});
+
+test('loadProjectList clears stale project rows after a list failure', async () => {
+  const brokenStorage = {
+    async listProjects() {
+      throw new Error('list unavailable');
+    },
+  };
+  useStore.setState(useStore.getInitialState(), true);
+  useStore.setState({
+    availableProjects: [{ id: 'old', name: 'Old Project' }],
+  });
+
+  await assert.rejects(() => useStore.getState().loadProjectList(brokenStorage), /list unavailable/);
+
+  assert.deepEqual(useStore.getState().availableProjects, []);
+  assert.equal(useStore.getState().savedProjectStatus, 'error');
 });

@@ -10,9 +10,12 @@ import {
 import { applyManifestToSceneObjects } from '../lib/manifestImport.js';
 import {
   hydrateProjectSnapshot,
+  listSavedProjects,
+  projectIdForName,
   readSavedProject,
   serializeProjectState,
   writeSavedProject,
+  DEFAULT_PROJECT_ID,
 } from '../lib/projectPersistence.js';
 import {
   buildShowtimeSteps,
@@ -40,6 +43,10 @@ const BACKGROUND_GALLERY_LIMIT = 12;
 
 const resettableProjectState = () => ({
   leftPanelTab: 'import',
+  projectId: DEFAULT_PROJECT_ID,
+  projectName: 'RoomCraft Demo',
+  availableProjects: [],
+  projectPickerOpen: false,
   chatSubTab: 'prompt',
   activeTool: 'select',
   viewMode: 'material',
@@ -210,9 +217,10 @@ const useStore = create((set, get) => ({
   setCurrentView: (view) => set({ currentView: view }),
   requestOpenSavedProject: () =>
     set((state) => ({
-      currentView: 'editor',
+      currentView: state.currentView === 'landing' ? 'landing' : 'editor',
+      projectPickerOpen: true,
       openSavedProjectRequestId: state.openSavedProjectRequestId + 1,
-      restoredProjectNotice: 'Opening saved project...',
+      restoredProjectNotice: 'Choose a saved project to open.',
       savedProjectError: null,
     })),
 
@@ -466,15 +474,36 @@ const useStore = create((set, get) => ({
     }),
 
   // Project persistence
-  saveProject: async (storage) => {
+  setProjectPickerOpen: (projectPickerOpen) => set({ projectPickerOpen }),
+  loadProjectList: async (storage) => {
     try {
-      const snapshot = serializeProjectState(get());
-      await writeSavedProject(snapshot, storage);
+      const projects = await listSavedProjects(storage);
       set({
+        availableProjects: projects,
+        savedProjectStatus: projects.length ? 'listed' : 'not_found',
+        savedProjectError: projects.length ? null : 'No saved projects were found.',
+      });
+      return projects;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      set({ availableProjects: [], savedProjectStatus: 'error', savedProjectError: message });
+      throw error;
+    }
+  },
+  saveProject: async (storage, options = {}) => {
+    try {
+      const current = get();
+      const projectName = options.projectName ?? current.projectName ?? 'RoomCraft Demo';
+      const projectId = options.projectId ?? current.projectId ?? projectIdForName(projectName);
+      const snapshot = serializeProjectState(current, { projectId, projectName });
+      await writeSavedProject(snapshot, storage, projectId);
+      set({
+        projectId,
+        projectName,
         savedProjectStatus: 'saved',
         savedProjectError: null,
         savedProjectUpdatedAt: snapshot.savedAt,
-        restoredProjectNotice: 'Project saved locally.',
+        restoredProjectNotice: `Project saved to ${projectName}.`,
       });
       return snapshot;
     } catch (error) {
@@ -487,9 +516,16 @@ const useStore = create((set, get) => ({
       throw error;
     }
   },
-  loadSavedProject: async (storage) => {
+  saveProjectAs: async (projectName, storage) => {
+    const name = String(projectName ?? '').trim() || 'RoomCraft Demo';
+    return get().saveProject(storage, {
+      projectId: projectIdForName(name),
+      projectName: name,
+    });
+  },
+  loadSavedProject: async (storage, projectId = get().projectId ?? DEFAULT_PROJECT_ID) => {
     try {
-      const snapshot = await readSavedProject(storage);
+      const snapshot = await readSavedProject(storage, projectId);
       if (!snapshot) {
         set({
           currentView: 'editor',
@@ -508,6 +544,7 @@ const useStore = create((set, get) => ({
         highlightedObjectId: null,
         savedProjectStatus: 'loaded',
         savedProjectError: null,
+        projectPickerOpen: false,
       });
       return snapshot;
     } catch (error) {

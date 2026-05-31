@@ -78,6 +78,8 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
 
   assert.equal(snapshot.version, PROJECT_SAVE_VERSION);
   assert.equal(snapshot.project.currentView, 'editor');
+  assert.equal(snapshot.project.projectId, 'roomcraft-demo');
+  assert.equal(snapshot.project.projectName, 'RoomCraft Demo');
   assert.equal(snapshot.project.gravityEnabled, true);
   assert.equal(snapshot.project.collisionsEnabled, false);
   assert.equal(snapshot.project.objectLabelsEnabled, true);
@@ -236,7 +238,7 @@ test('hybrid project storage keeps a compact local fallback for reload recovery'
   await writeSavedProject(snapshot, createHybridProjectStorage(primary, fallback));
 
   assert.deepEqual(await readSavedProject(primary), snapshot);
-  const fallbackSnapshot = JSON.parse(fallbackValues.get('roomcraft:last-project'));
+  const fallbackSnapshot = JSON.parse(fallbackValues.get('roomcraft:project:roomcraft-demo'));
   assert.equal(fallbackSnapshot.project.assetSources[0].dataUrl, undefined);
   assert.equal(fallbackSnapshot.project.assetSources[0].dataUrlUnavailable, true);
   assert.equal(fallbackSnapshot.project.sceneObjects[0].id, 'duck_01');
@@ -273,9 +275,28 @@ test('remote project storage saves compact snapshots and treats 404 as no projec
   assert.equal(await readSavedProject(storage), null);
 
   const savedBody = JSON.parse(requests[0].init.body);
-  assert.equal(requests[0].url, 'http://127.0.0.1:8787/api/projects/last');
+  assert.equal(requests[0].url, 'http://127.0.0.1:8787/api/projects/roomcraft-demo');
   assert.equal(savedBody.project.assetSources[0].dataUrl, undefined);
   assert.equal(savedBody.project.assetSources[0].dataUrlUnavailable, true);
+});
+
+test('remote project storage lists named project folders', async () => {
+  const fetchImpl = async (url) => {
+    assert.equal(url, 'http://127.0.0.1:8787/api/projects');
+    return new Response(JSON.stringify({
+      projects: [
+        { id: 'demo-night-room', name: 'Demo Night Room', savedAt: '2026-05-30T22:00:00.000Z' },
+      ],
+    }), { status: 200 });
+  };
+  const storage = createRemoteProjectStorage({
+    apiBaseUrl: 'http://127.0.0.1:8787/',
+    fetchImpl,
+  });
+
+  assert.deepEqual(await storage.listProjects(), [
+    { id: 'demo-night-room', name: 'Demo Night Room', savedAt: '2026-05-30T22:00:00.000Z' },
+  ]);
 });
 
 test('remote project storage preserves data urls by default so the backend can bundle project files', async () => {
@@ -321,4 +342,28 @@ test('primary project storage requires the authoritative save and mirrors best-e
   await writeSavedProject(snapshot, createPrimaryProjectStorage(primary, brokenMirror));
 
   assert.deepEqual(await readSavedProject(primary), snapshot);
+});
+
+test('primary project storage falls back to the mirror when reads or lists fail', async () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    projectId: 'mirror-project',
+    projectName: 'Mirror Project',
+    sceneObjects: [],
+  });
+  const brokenPrimary = {
+    async getProject() {
+      throw new Error('remote unavailable');
+    },
+    async setProject() {},
+    async listProjects() {
+      throw new Error('remote unavailable');
+    },
+  };
+  const mirror = createMemoryProjectStorage();
+  await writeSavedProject(snapshot, mirror, 'mirror-project');
+  const storage = createPrimaryProjectStorage(brokenPrimary, mirror);
+
+  assert.deepEqual(await readSavedProject(storage, 'mirror-project'), snapshot);
+  assert.equal((await storage.listProjects())[0].id, 'mirror-project');
 });

@@ -1,9 +1,9 @@
 import useStore from '../store/useStore.js';
 import { restoreSceneObjectsFromAssets } from './projectRestore.js';
 
-export async function openSavedProjectFromStorage(storage) {
+export async function openSavedProjectFromStorage(storage, projectId) {
   try {
-    const snapshot = await useStore.getState().loadSavedProject(storage);
+    const snapshot = await useStore.getState().loadSavedProject(storage, projectId);
     if (!snapshot) return null;
 
     useStore.getState().setSavedProjectStatus('restoring', null);

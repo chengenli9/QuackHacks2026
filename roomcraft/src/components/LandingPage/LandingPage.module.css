@@ -46,7 +46,7 @@
 .actions {
   display: flex;
   gap: var(--space-xl);
-  margin-bottom: 64px;
+  margin-bottom: var(--space-xl);
 }
 
 .card {
@@ -97,6 +97,54 @@
   color: var(--text-muted);
   text-align: center;
   line-height: 1.5;
+}
+
+.projectList {
+  width: min(560px, 100%);
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  margin-bottom: 48px;
+}
+
+.projectListHeader {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.projectRow {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+}
+
+.projectRow:hover {
+  background: var(--bg-hover);
+}
+
+.projectRow small,
+.emptyProjects {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.emptyProjects {
+  padding: var(--space-md);
+  font-family: var(--font-ui);
 }
 
 .footer {

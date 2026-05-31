@@ -47,13 +47,55 @@ describe("project persistence API", () => {
     });
 
     expect(saved.statusCode).toBe(200);
-    expect(saved.json()).toEqual({ ok: true, savedAt: snapshot.savedAt });
+    expect(saved.json()).toEqual({ ok: true, projectId: "last-project", savedAt: snapshot.savedAt });
 
     const loaded = await app.inject({ method: "GET", url: "/api/projects/last" });
     expect(loaded.statusCode).toBe(200);
     expect(loaded.json()).toEqual(snapshot);
 
     const storedFile = await readFile(join(projectStorageDir, "last-project", "project.json"), "utf8");
+    expect(JSON.parse(storedFile)).toEqual(snapshot);
+  });
+
+  it("stores, lists, and reloads named project folders", async () => {
+    const projectStorageDir = mkdtempSync(join(tmpdir(), "roomcraft-projects-"));
+    app = await createApp({ projectStorageDir });
+    const snapshot = {
+      version: 1,
+      savedAt: "2026-05-30T22:30:00.000Z",
+      project: {
+        projectId: "demo-night-room",
+        projectName: "Demo Night Room",
+        importedGlbFileName: "room.glb",
+        sceneObjects: [{ id: "chair_01", label: "chair" }],
+        assetSources: []
+      }
+    };
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/api/projects/demo-night-room",
+      payload: snapshot
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({ ok: true, projectId: "demo-night-room" });
+
+    const list = await app.inject({ method: "GET", url: "/api/projects" });
+    expect(list.statusCode).toBe(200);
+    expect(list.json().projects).toEqual([
+      expect.objectContaining({
+        id: "demo-night-room",
+        name: "Demo Night Room",
+        importedGlbFileName: "room.glb",
+        objectCount: 1
+      })
+    ]);
+
+    const loaded = await app.inject({ method: "GET", url: "/api/projects/demo-night-room" });
+    expect(loaded.statusCode).toBe(200);
+    expect(loaded.json()).toEqual(snapshot);
+
+    const storedFile = await readFile(join(projectStorageDir, "demo-night-room", "project.json"), "utf8");
     expect(JSON.parse(storedFile)).toEqual(snapshot);
   });
 
@@ -108,26 +150,26 @@ describe("project persistence API", () => {
       id: "asset_duck",
       type: "url",
       fileName: "duck.glb",
-      url: "http://localhost:8787/api/projects/last/assets/asset_duck.glb"
+      url: "http://localhost:8787/api/projects/last-project/assets/asset_duck.glb"
     });
     expect(loaded.json().project.assetSources[0].dataUrl).toBeUndefined();
     expect(loaded.json().project.sceneBackground.imageDataUrl).toBe(
-      "http://localhost:8787/api/projects/last/backgrounds/background_1.png"
+      "http://localhost:8787/api/projects/last-project/backgrounds/background_1.png"
     );
     expect(loaded.json().project.backgroundGallery[0].imageDataUrl).toBe(
-      "http://localhost:8787/api/projects/last/backgrounds/background_1.png"
+      "http://localhost:8787/api/projects/last-project/backgrounds/background_1.png"
     );
 
     const asset = await app.inject({
       method: "GET",
-      url: "/api/projects/last/assets/asset_duck.glb"
+      url: "/api/projects/last-project/assets/asset_duck.glb"
     });
     expect(asset.statusCode).toBe(200);
     expect(asset.body).toBe("glb");
 
     const background = await app.inject({
       method: "GET",
-      url: "/api/projects/last/backgrounds/background_1.png"
+      url: "/api/projects/last-project/backgrounds/background_1.png"
     });
     expect(background.statusCode).toBe(200);
     expect(background.body).toBe("png");
