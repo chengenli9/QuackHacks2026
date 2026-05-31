@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Camera, ChevronRight, Eye, Globe, Lightbulb } from 'lucide-react';
+import { Box, Camera, ChevronRight, Eye, Globe, Lightbulb, Package } from 'lucide-react';
 import useStore from '../../store/useStore';
 import styles from './RightPanel.module.css';
 
@@ -19,6 +19,7 @@ const STATIC_TREE = [
           { id: 'Ceiling', label: 'Ceiling', icon: Box },
         ],
       },
+      { id: 'ChaoMan', label: 'ChaoMan', icon: Package },
       {
         id: 'Lights',
         label: 'Lights',
