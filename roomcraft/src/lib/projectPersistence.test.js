@@ -95,6 +95,43 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.project.chatMessages[0].text, 'save this');
 });
 
+test('serializeProjectState saves pre-showtime viewport state when presentation mode is active', () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    activeTool: 'select',
+    viewMode: 'material',
+    perspective: 'Perspective',
+    overlaysEnabled: true,
+    objectLabelsEnabled: true,
+    collisionsEnabled: true,
+    floorEnabled: true,
+    selectedObjectId: 'duck_01',
+    showtimeEnabled: true,
+    showtimeReturnState: {
+      activeTool: 'move',
+      viewMode: 'wireframe',
+      perspective: 'Top',
+      overlaysEnabled: false,
+      objectLabelsEnabled: false,
+      collisionsEnabled: false,
+      floorEnabled: false,
+      selectedObjectId: 'table_01',
+    },
+    sceneObjects: [object({ id: 'table_01', label: 'table' })],
+  });
+
+  assert.equal(snapshot.project.activeTool, 'move');
+  assert.equal(snapshot.project.viewMode, 'wireframe');
+  assert.equal(snapshot.project.perspective, 'Top');
+  assert.equal(snapshot.project.overlaysEnabled, false);
+  assert.equal(snapshot.project.objectLabelsEnabled, false);
+  assert.equal(snapshot.project.collisionsEnabled, false);
+  assert.equal(snapshot.project.floorEnabled, false);
+  assert.equal(snapshot.project.selectedObjectId, 'table_01');
+  assert.equal(snapshot.project.showtimeEnabled, undefined);
+  assert.equal(snapshot.project.showtimeReturnState, undefined);
+});
+
 test('hydrateProjectSnapshot restores saved object metadata as metadata-only until meshes reload', () => {
   const snapshot = serializeProjectState({
     currentView: 'editor',

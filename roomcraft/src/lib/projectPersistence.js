@@ -43,12 +43,15 @@ const PROJECT_FIELDS = [
 
 export function serializeProjectState(state) {
   const project = {};
+  const serializableState = state.showtimeEnabled && state.showtimeReturnState
+    ? { ...state, ...state.showtimeReturnState }
+    : state;
 
   for (const field of PROJECT_FIELDS) {
     if (field === 'sceneObjects') {
-      project.sceneObjects = (state.sceneObjects ?? []).map(stripRuntimeObject);
+      project.sceneObjects = (serializableState.sceneObjects ?? []).map(stripRuntimeObject);
     } else {
-      project[field] = cloneJson(state[field]);
+      project[field] = cloneJson(serializableState[field]);
     }
   }
 
