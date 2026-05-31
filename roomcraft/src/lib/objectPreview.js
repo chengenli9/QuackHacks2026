@@ -12,6 +12,34 @@ import {
 
 const IMAGE_DATA_URL_RE = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/;
 
+export function createObjectPreviewRendererManager({ createRenderer = createPreviewRenderer } = {}) {
+  let renderer = null;
+
+  return {
+    getRenderer() {
+      if (renderer && rendererContextLost(renderer)) {
+        this.releaseRenderer();
+      }
+      if (!renderer) renderer = createRenderer();
+      return renderer;
+    },
+    releaseRenderer() {
+      if (!renderer) return;
+      const current = renderer;
+      renderer = null;
+      current.dispose?.();
+      current.forceContextLoss?.();
+      current.domElement?.remove?.();
+    },
+  };
+}
+
+const defaultPreviewRendererManager = createObjectPreviewRendererManager();
+
+export function releaseObjectPreviewRenderer() {
+  defaultPreviewRendererManager.releaseRenderer();
+}
+
 export function dataUrlToImagePayload(dataUrl) {
   const match = IMAGE_DATA_URL_RE.exec(dataUrl);
   if (!match) {
@@ -24,15 +52,15 @@ export function dataUrlToImagePayload(dataUrl) {
   };
 }
 
-export function renderObjectPreviewToDataUrl(object3d, { width = 384, height = 384 } = {}) {
+export function renderObjectPreviewToDataUrl(
+  object3d,
+  { width = 384, height = 384, rendererManager = defaultPreviewRendererManager } = {}
+) {
   if (typeof document === 'undefined') {
     throw new Error('Object preview rendering requires a browser document.');
   }
 
-  const renderer = new WebGLRenderer({
-    antialias: true,
-    preserveDrawingBuffer: true,
-  });
+  const renderer = rendererManager.getRenderer();
   renderer.setSize(width, height, false);
   renderer.setClearColor(new Color('#202226'), 1);
 
@@ -61,7 +89,21 @@ export function renderObjectPreviewToDataUrl(object3d, { width = 384, height = 3
   scene.add(keyLight);
 
   renderer.render(scene, camera);
-  const dataUrl = renderer.domElement.toDataURL('image/png');
-  renderer.dispose();
-  return dataUrl;
+  return renderer.domElement.toDataURL('image/png');
+}
+
+function createPreviewRenderer() {
+  return new WebGLRenderer({
+    antialias: true,
+    preserveDrawingBuffer: true,
+    powerPreference: 'low-power',
+  });
+}
+
+function rendererContextLost(renderer) {
+  try {
+    return Boolean(renderer.getContext?.().isContextLost?.());
+  } catch {
+    return false;
+  }
 }
