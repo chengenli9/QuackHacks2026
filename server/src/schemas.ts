@@ -30,6 +30,8 @@ export const generatedAssetSchema = z.object({
   provider: providerSchema,
   sourcePrompt: z.string().min(1),
   glbUrl: z.string().url(),
+  cachedGlbUrl: z.string().url().optional(),
+  originalGlbUrl: z.string().url().optional(),
   thumbnailUrl: z.string().url().optional(),
   metadata: z.record(z.string(), z.unknown()).optional()
 });

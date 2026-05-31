@@ -134,6 +134,32 @@ function EditablePhysicsSection({ object, updateSceneObjectPhysics }) {
   );
 }
 
+function SemanticMetadataSection({ object }) {
+  const physics = object.physics ?? {};
+  const appearance = object.appearance ?? {};
+  const rows = [
+    ['Category', physics.category ?? '-'],
+    ['Material', physics.material ?? '-'],
+    ['Confidence', Number.isFinite(physics.confidence) ? `${Math.round(physics.confidence * 100)}%` : '-'],
+    ['Physics Source', physics.needsVisualEstimate ? 'Needs VLM' : physics.source ?? '-'],
+    ['Texture', appearance.textureDescription || '-'],
+    ['Appearance Source', appearance.source ?? '-'],
+    ['Notes', physics.notes || '-'],
+  ];
+
+  return (
+    <div className={styles.propSection}>
+      <div className={styles.propSectionHeader}>Semantic Metadata</div>
+      {rows.map(([key, value]) => (
+        <div key={key} className={styles.meshInfoRow}>
+          <span className={styles.meshInfoKey}>{key}</span>
+          <span className={styles.meshInfoVal}>{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function NumberSlider({ label, value, min, max, step, onChange, disabled = false }) {
   return (
     <div className={styles.sliderRow}>
@@ -266,7 +292,10 @@ export default function PropertiesPanel() {
         </div>
 
         {selectedSceneObject && (
-          <EditablePhysicsSection object={selectedSceneObject} updateSceneObjectPhysics={updateSceneObjectPhysics} />
+          <>
+            <SemanticMetadataSection object={selectedSceneObject} />
+            <EditablePhysicsSection object={selectedSceneObject} updateSceneObjectPhysics={updateSceneObjectPhysics} />
+          </>
         )}
 
         {data.verts && (

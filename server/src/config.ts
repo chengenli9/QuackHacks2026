@@ -16,6 +16,7 @@ export type ServerConfig = {
   openAiBaseUrl: string;
   publicBaseUrl: string;
   generatedAssetStorageDir: string;
+  fallbackAssetDir: string;
 };
 
 export const loadEnvFile = (
@@ -58,6 +59,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
   publicBaseUrl: env.SERVER_PUBLIC_URL ?? `http://localhost:${env.PORT ?? 8787}`,
   generatedAssetStorageDir: resolve(
     env.GENERATED_ASSET_STORAGE_DIR ?? "storage/generated-assets"
+  ),
+  fallbackAssetDir: resolve(
+    env.FALLBACK_ASSET_DIR ?? "public/assets/fallback"
   )
 });
 

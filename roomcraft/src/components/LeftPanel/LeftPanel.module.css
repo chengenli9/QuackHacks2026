@@ -212,6 +212,19 @@
   color: var(--text-muted);
 }
 
+.progressTrack {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
 .importNotice {
   display: flex;
   align-items: flex-start;
@@ -341,6 +354,36 @@
   padding: var(--space-sm);
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
+}
+
+.scriptedPrompts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.scriptedPrompts button {
+  padding: 5px var(--space-sm);
+  border-radius: 3px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  text-align: left;
+}
+
+.scriptedPrompts button:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.scriptedPrompts button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .chatInput {

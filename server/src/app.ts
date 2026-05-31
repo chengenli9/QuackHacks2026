@@ -1,5 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { createReadStream, existsSync } from "node:fs";
+import { join } from "node:path";
 import { ZodError } from "zod";
 import { HttpError, validationErrorResponse } from "./errors.js";
 import { loadConfig } from "./config.js";
@@ -17,6 +19,7 @@ import { registerEstimateObjectRoutes } from "./routes/estimateObject.js";
 import { registerGenerateAssetRoutes } from "./routes/generateAsset.js";
 import { registerGeneratedAssetModelRoutes } from "./routes/generatedAssetModel.js";
 import { registerGeneratedAssetStatusRoutes } from "./routes/generatedAssetStatus.js";
+import { fallbackAssetKeySchema } from "./schemas.js";
 import { AssetGenerationService } from "./services/assetGenerationService.js";
 import { GeneratedAssetCache } from "./services/generatedAssetCache.js";
 import { LocalObjectPropertyEstimator } from "./services/localObjectPropertyEstimator.js";
@@ -28,6 +31,9 @@ export type AppOptions = {
   objectEstimator?: ObjectPropertyEstimator;
   commandParser?: CommandParser;
   publicBaseUrl?: string;
+  fallbackAssetDir?: string;
+  generatedAssetStorageDir?: string;
+  fetch?: typeof fetch;
 };
 
 export const createApp = async (options: AppOptions = {}) => {
@@ -36,14 +42,21 @@ export const createApp = async (options: AppOptions = {}) => {
   const assetGenerator = options.assetGenerator ?? createDefaultAssetGenerator();
   const objectEstimator = options.objectEstimator ?? createDefaultObjectEstimator();
   const commandParser = options.commandParser ?? createDefaultCommandParser();
+  const publicBaseUrl = options.publicBaseUrl ?? config.publicBaseUrl;
+  const fallbackAssetDir = options.fallbackAssetDir ?? config.fallbackAssetDir;
   const localAssetProvider = new LocalAssetProvider(
-    options.publicBaseUrl ?? config.publicBaseUrl
+    publicBaseUrl,
+    fallbackAssetDir
   );
   const assetGenerationService = new AssetGenerationService(
     assetGenerator,
     localAssetProvider,
     new MeshyTaskStore(),
-    new GeneratedAssetCache(config.generatedAssetStorageDir)
+    new GeneratedAssetCache(
+      options.generatedAssetStorageDir ?? config.generatedAssetStorageDir,
+      publicBaseUrl,
+      options.fetch ?? globalThis.fetch
+    )
   );
 
   await app.register(cors, {
@@ -73,6 +86,27 @@ export const createApp = async (options: AppOptions = {}) => {
     ok: true,
     service: "quackhacks-backend"
   }));
+
+  app.get<{ Params: { file: string } }>("/assets/fallback/:file", async (request, reply) => {
+    const file = request.params.file;
+    const key = file.endsWith(".glb") ? file.slice(0, -4) : file;
+    const parsed = fallbackAssetKeySchema.safeParse(key);
+
+    if (!parsed.success || file !== `${parsed.data}.glb`) {
+      throw new HttpError(404, "FallbackAssetNotFound", `Unknown fallback asset: ${file}`);
+    }
+
+    const path = join(fallbackAssetDir, `${parsed.data}.glb`);
+    if (!existsSync(path)) {
+      throw new HttpError(
+        404,
+        "FallbackAssetFileMissing",
+        `Fallback asset file missing: ${parsed.data}.glb`
+      );
+    }
+
+    return reply.type("model/gltf-binary").send(createReadStream(path));
+  });
 
   await app.register(async (instance) =>
     registerCommandRoutes(instance, commandParser)

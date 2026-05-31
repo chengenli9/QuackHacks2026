@@ -37,6 +37,16 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
     return validateOperation({ action: "export_scene" });
   }
 
+  const transform = parseTransformCommand(message, normalized, request.sceneContext.objects);
+  if (transform) {
+    return transform;
+  }
+
+  const relabel = parseRelabelCommand(message, normalized, request.sceneContext.objects);
+  if (relabel) {
+    return relabel;
+  }
+
   const generated = parseGeneratedAssetCommand(message, request.sceneContext.objects);
   if (generated) {
     return generated;
@@ -78,12 +88,70 @@ const parseGeneratedAssetCommand = (
   const [assetPart, targetPart] = splitPlacement(withoutVerb);
   const prompt = cleanupAssetPrompt(assetPart);
   const placement = placementFor(targetPart, objects);
+  const wantsLocalFallback = /\b(local|fallback)\b/.test(normalized);
+  const fallbackAssetKey = fallbackKeyFor(prompt);
+
+  if (wantsLocalFallback && fallbackAssetKey) {
+    return validateOperation({
+      action: "add_local_object",
+      fallbackAssetKey,
+      placement
+    });
+  }
 
   return validateOperation({
     action: "add_generated_object",
     prompt,
     placement,
-    fallbackAssetKey: fallbackKeyFor(prompt)
+    fallbackAssetKey
+  });
+};
+
+const parseTransformCommand = (
+  message: string,
+  normalized: string,
+  objects: SceneObject[]
+): SceneOperation | undefined => {
+  const action = normalized.includes("move")
+    ? "move_object"
+    : normalized.includes("rotate")
+      ? "rotate_object"
+      : normalized.includes("scale")
+        ? "scale_object"
+        : undefined;
+
+  if (!action) return undefined;
+  const target = findMentionedObject(normalized, objects);
+  if (!target) return undefined;
+  const vector = parseVector3(message);
+  if (!vector) return undefined;
+
+  if (action === "move_object") {
+    return validateOperation({ action, target: target.id, position: vector });
+  }
+  if (action === "rotate_object") {
+    return validateOperation({ action, target: target.id, rotation: vector });
+  }
+  return validateOperation({ action, target: target.id, scale: vector });
+};
+
+const parseRelabelCommand = (
+  message: string,
+  normalized: string,
+  objects: SceneObject[]
+): SceneOperation | undefined => {
+  if (!/\b(rename|relabel|call)\b/.test(normalized)) return undefined;
+  const target = findMentionedObject(normalized, objects);
+  if (!target) return undefined;
+
+  const labelMatch = message.match(/\b(?:to|as)\s+(.+)$/i);
+  const label = labelMatch?.[1]?.trim().replace(/[.!?]+$/, "");
+  if (!label) return undefined;
+
+  return validateOperation({
+    action: "relabel_object",
+    target: target.id,
+    label
   });
 };
 
@@ -173,9 +241,18 @@ const splitPlacement = (value: string): [string, string | undefined] => {
 
 const cleanupAssetPrompt = (value: string): string =>
   value
+    .replace(/\b(local|fallback)\b/gi, "")
     .replace(/^(a|an|the)\s+/i, "")
     .replace(/\s+/g, " ")
     .trim();
+
+const parseVector3 = (message: string): [number, number, number] | undefined => {
+  const match = message.match(
+    /\b(?:to|at)\s+(-?\d+(?:\.\d+)?)\s*,?\s+(-?\d+(?:\.\d+)?)\s*,?\s+(-?\d+(?:\.\d+)?)/i
+  );
+  if (!match) return undefined;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+};
 
 const placementFor = (
   targetPart: string | undefined,

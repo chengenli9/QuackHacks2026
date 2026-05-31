@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
-import { Hexagon } from 'lucide-react';
+import { Hexagon, RotateCcw } from 'lucide-react';
 import useStore from '../../store/useStore';
+import { exportSceneArtifacts } from '../../lib/sceneExport';
 import styles from './TopBar.module.css';
 
 const MENUS = {
   File: [
-    { label: 'New Scene' },
+    { label: 'New Scene', action: 'resetProject' },
     { label: 'Open...' },
     { label: 'Save' },
     '---',
     { label: 'Import .glb', action: 'importGlb' },
-    { label: 'Export Scene' },
+    { label: 'Export Scene', action: 'exportScene' },
     '---',
     { label: 'Quit' },
   ],
@@ -68,10 +69,22 @@ function MenuDropdown({ label, items, open, onToggle, onAction }) {
 export default function TopBar() {
   const [openMenu, setOpenMenu] = useState(null);
   const requestGlbImport = useStore((state) => state.requestGlbImport);
+  const resetProject = useStore((state) => state.resetProject);
+  const addGlbImportWarning = useStore((state) => state.addGlbImportWarning);
 
-  const handleMenuAction = (action) => {
-    if (action === 'importGlb') {
-      requestGlbImport();
+  const handleMenuAction = async (action) => {
+    try {
+      if (action === 'importGlb') {
+        requestGlbImport();
+      }
+      if (action === 'exportScene') {
+        await exportSceneArtifacts({ sceneObjects: useStore.getState().sceneObjects });
+      }
+      if (action === 'resetProject') {
+        resetProject();
+      }
+    } catch (error) {
+      addGlbImportWarning(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
@@ -90,12 +103,15 @@ export default function TopBar() {
             items={items}
             open={openMenu === label}
             onToggle={setOpenMenu}
-            onAction={handleMenuAction}
+            onAction={(action) => void handleMenuAction(action)}
           />
         ))}
       </nav>
 
-
+      <button className={styles.resetBtn} onClick={resetProject} title="Reset scene">
+        <RotateCcw size={13} />
+        Reset
+      </button>
     </header>
   );
 }

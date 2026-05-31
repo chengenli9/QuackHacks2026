@@ -143,3 +143,21 @@
   pointer-events: none;
   z-index: 300;
 }
+
+.resetBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 5px var(--space-sm);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-panel-alt);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+
+.resetBtn:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}

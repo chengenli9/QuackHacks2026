@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { AlertTriangle, Box, Sparkles, X } from 'lucide-react';
 import useStore from '../../store/useStore';
 import { requestFallbackAsset } from '../../lib/apiClient';
+import { generatedTaskDisplayStatus } from '../../lib/generatedTaskState';
 import { loadGlbIntoScene } from '../../lib/glbImport';
 import styles from './LeftPanel.module.css';
 
@@ -43,24 +44,30 @@ export default function ImportPanel() {
     importedGlbFileName,
     glbImportRequestId,
     sceneObjects,
+    manifestFileName,
+    manifestStatus,
+    manifestWarnings,
     glbImportStatus,
     glbImportError,
     glbImportWarnings,
     vlmEstimateStatus,
     generatedTasks,
+    demoSceneUrl,
     setGlbImportStatus,
     setVlmEstimateStatus,
     addImportedScene,
     mergeSceneObjectEstimate,
     addGlbImportWarning,
+    mergeManifestMetadata,
+    setManifestStatus,
     clearImportedScene,
     upsertGeneratedTask,
   } = useStore();
   const lastHandledGlbImportRequest = useRef(0);
 
-  const importFromUrl = useCallback(async ({ url, fileName, sourcePrompt, placement }) => {
+  const importFromUrl = useCallback(async ({ url, fileName, sourcePrompt, placement, manifest }) => {
     try {
-      await loadGlbIntoScene({
+      return await loadGlbIntoScene({
         sourceUrl: url,
         fileName,
         sceneObjects: useStore.getState().sceneObjects,
@@ -71,10 +78,12 @@ export default function ImportPanel() {
         addGlbImportWarning,
         sourcePrompt,
         placement,
+        manifest,
       });
     } catch (error) {
       setGlbImportStatus('error', errorMessage(error));
       setVlmEstimateStatus('error');
+      return [];
     }
   }, [
     addGlbImportWarning,
@@ -84,24 +93,50 @@ export default function ImportPanel() {
     setVlmEstimateStatus,
   ]);
 
-  const importFile = useCallback(async (file) => {
+  const importFile = useCallback(async (file, manifest) => {
     const url = URL.createObjectURL(file);
     try {
-      await importFromUrl({ url, fileName: file.name });
+      await importFromUrl({ url, fileName: file.name, manifest });
     } finally {
       URL.revokeObjectURL(url);
     }
   }, [importFromUrl]);
 
+  const readManifestFile = useCallback(async (file) => {
+    setManifestStatus('loading');
+    try {
+      const manifest = JSON.parse(await file.text());
+      setManifestStatus('ready', [], file.name);
+      return manifest;
+    } catch (error) {
+      setManifestStatus('error', [`Could not parse manifest.json: ${errorMessage(error)}`], file.name);
+      return null;
+    }
+  }, [setManifestStatus]);
+
   const onGlbDrop = useCallback((accepted) => {
     if (!accepted.length) return;
-    void importFile(accepted[0]);
-  }, [importFile]);
+    void (async () => {
+      const manifestFile = accepted.find((file) => file.name.toLowerCase().endsWith('.json'));
+      const glbFile = accepted.find((file) => file.name.toLowerCase().endsWith('.glb'));
+      const manifest = manifestFile ? await readManifestFile(manifestFile) : null;
+
+      if (glbFile) {
+        await importFile(glbFile, manifest);
+      } else if (manifestFile && manifest) {
+        mergeManifestMetadata({ fileName: manifestFile.name, manifest });
+      }
+    })();
+  }, [importFile, mergeManifestMetadata, readManifestFile]);
 
   const glbDropzone = useDropzone({
     onDrop: onGlbDrop,
-    accept: { 'model/gltf-binary': ['.glb'], 'application/octet-stream': ['.glb'] },
-    multiple: false,
+    accept: {
+      'model/gltf-binary': ['.glb'],
+      'application/octet-stream': ['.glb'],
+      'application/json': ['.json'],
+    },
+    multiple: true,
   });
 
   useEffect(() => {
@@ -125,9 +160,14 @@ export default function ImportPanel() {
         sourcePrompt: asset.sourcePrompt,
         placement: task.placement,
       });
+      upsertGeneratedTask({ ...task, ...asset, status: 'ready' });
     } catch (error) {
       upsertGeneratedTask({ ...task, status: 'fallback-error', error: errorMessage(error) });
     }
+  };
+
+  const handleDemoScene = () => {
+    void importFromUrl({ url: demoSceneUrl, fileName: demoSceneUrl.split('/').pop() || 'demo-scene.glb' });
   };
 
   return (
@@ -141,9 +181,13 @@ export default function ImportPanel() {
         <input {...glbDropzone.getInputProps()} />
         <Box size={20} className={styles.dropzoneIcon} />
         <span className={styles.dropzoneText}>
-          Drop .glb scene<br />or click to browse
+          Drop .glb scene and optional manifest.json<br />or click to browse
         </span>
       </div>
+
+      <button className={styles.processBtn} onClick={handleDemoScene}>
+        Load Demo Scene
+      </button>
 
       {glbImportStatus === 'loading' && (
         <div className={styles.importNotice}>
@@ -176,6 +220,16 @@ export default function ImportPanel() {
         </div>
       )}
 
+      {(manifestFileName || manifestStatus !== 'idle') && (
+        <div className={styles.importSummary}>
+          <div className={styles.importName}>{manifestFileName ?? 'manifest.json'}</div>
+          <div className={styles.importMetaRow}>
+            <span>Manifest</span>
+            <span>{manifestStatus}</span>
+          </div>
+        </div>
+      )}
+
       {generatedTasks.length > 0 && (
         <>
           <div className={styles.panelDivider} />
@@ -185,10 +239,15 @@ export default function ImportPanel() {
               <div className={styles.importName}>{task.prompt}</div>
               <div className={styles.importMetaRow}>
                 <span>{task.provider ?? 'meshy'}</span>
-                <span>{task.status}</span>
+                <span>{generatedTaskDisplayStatus(task)}</span>
               </div>
+              {Number.isFinite(task.progress) && (
+                <div className={styles.progressTrack}>
+                  <div className={styles.progressFill} style={{ width: `${task.progress}%` }} />
+                </div>
+              )}
               {task.error && <div className={styles.importMetaRow}>{task.error}</div>}
-              {task.status === 'failed' && task.fallbackAssetKey && (
+              {(task.status === 'failed' || task.status === 'fallback_available') && task.fallbackAssetKey && (
                 <button className={styles.processBtn} onClick={() => void handleFallbackAsset(task)}>
                   Use fallback asset
                 </button>
@@ -199,6 +258,13 @@ export default function ImportPanel() {
       )}
 
       {glbImportWarnings.map((warning) => (
+        <div key={warning} className={styles.importNotice}>
+          <AlertTriangle size={14} />
+          <span>{warning}</span>
+        </div>
+      ))}
+
+      {manifestWarnings.map((warning) => (
         <div key={warning} className={styles.importNotice}>
           <AlertTriangle size={14} />
           <span>{warning}</span>

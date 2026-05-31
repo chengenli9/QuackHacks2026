@@ -129,3 +129,16 @@ test('applies common scene operations to project state', () => {
   assert.equal(gravity.sceneObjects[0].physics.restitution, 0.85);
   assert.equal(gravity.gravityEnabled, true);
 });
+
+test('scene operation export requests use the shared export trigger', () => {
+  const state = applySceneOperationToState(
+    {
+      sceneObjects: [object()],
+      selectedObjectId: 'duck_01',
+      exportRequestedAt: null,
+    },
+    { action: 'export_scene' }
+  );
+
+  assert.equal(state.exportRequestedAt, 1);
+});

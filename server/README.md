@@ -20,6 +20,10 @@ GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-3.5-flash
 ```
 
+Put deterministic fallback GLBs in `server/public/assets/fallback` or set `FALLBACK_ASSET_DIR`.
+The required filenames are `rubber_ball.glb`, `wooden_crate.glb`, `glass_vase.glb`, `metal_barrel.glb`, and `duck.glb`.
+When a fallback file is missing, the API returns `FallbackAssetFileMissing` instead of a dead asset URL.
+
 ## Scripts
 
 ```bash
@@ -36,6 +40,8 @@ npm run build
 - `POST /api/generate-asset`
 - `GET /api/generated-assets/:id/status`
 - `GET /api/generated-assets/:id/model`
+- `GET /api/generated-assets/:id/model.glb`
 - `POST /api/generated-assets/fallback`
+- `GET /assets/fallback/:file`
 
-Generated asset metadata is persisted under `GENERATED_ASSET_STORAGE_DIR`, which defaults to `storage/generated-assets`.
+Generated asset metadata and proxied Meshy GLBs are persisted under `GENERATED_ASSET_STORAGE_DIR`, which defaults to `storage/generated-assets`.

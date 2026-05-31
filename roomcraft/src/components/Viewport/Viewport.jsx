@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { ArrowDown, MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
+import { ArrowDown, Box, MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import ThreeScene from './ThreeScene';
 import styles from './Viewport.module.css';
@@ -26,6 +26,9 @@ export default function Viewport() {
     toggleOverlays,
     gravityEnabled,
     setGravityEnabled,
+    collisionsEnabled,
+    setCollisionsEnabled,
+    sourceImageUrl,
   } = useStore();
   const [camPos, setCamPos] = useState({ x: 5.0, y: 3.2, z: 5.0 });
   const [cameraTarget, setCameraTarget] = useState(null);
@@ -130,6 +133,13 @@ export default function Viewport() {
         >
           <ArrowDown size={12} /> Gravity
         </button>
+
+        <button
+          className={`${styles.toolbarBtn} ${collisionsEnabled ? styles.active : ''}`}
+          onClick={() => setCollisionsEnabled(!collisionsEnabled)}
+        >
+          <Box size={12} /> Collisions
+        </button>
       </div>
 
       {/* Transform Toolbar */}
@@ -163,6 +173,12 @@ export default function Viewport() {
           </span>
         ))}
       </div>
+
+      {sourceImageUrl && (
+        <div className={styles.sourcePreview}>
+          <img src={sourceImageUrl} alt="Source scene" />
+        </div>
+      )}
     </div>
   );
 }

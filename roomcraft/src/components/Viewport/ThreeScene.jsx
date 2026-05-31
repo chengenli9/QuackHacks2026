@@ -6,6 +6,7 @@ import {
   GizmoViewport,
   Environment,
   Grid,
+  Html,
   OrbitControls,
   TransformControls,
 } from '@react-three/drei';
@@ -19,6 +20,11 @@ import {
   transformModeForTool,
 } from '../../lib/editorInteraction';
 import { floorColliderForSceneObjects } from '../../lib/floorCollider';
+import {
+  generatedTaskDisplayStatus,
+  isGeneratedTaskPlaceholderVisible,
+  placementPositionForTask,
+} from '../../lib/generatedTaskState';
 import { applyObjectAppearance } from '../../lib/objectAppearance';
 import { rapierBodyTypeFor, rapierColliderFor } from '../../lib/rapierMapping';
 
@@ -66,7 +72,7 @@ function GroundCollider({ sceneObjects }) {
   );
 }
 
-function ImportedSceneObject({ object, isSelected, onDragStateChange }) {
+function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnabled, onDragStateChange }) {
   const bodyRef = useRef(null);
   const isEditorDraggingRef = useRef(false);
   const lastRuntimePositionRef = useRef(object.transform.position);
@@ -164,7 +170,7 @@ function ImportedSceneObject({ object, isSelected, onDragStateChange }) {
         key={`${object.id}-${object.transformRevision}-${object.physicsRevision}`}
         ref={bodyRef}
         type={rapierBodyTypeFor(object.physics)}
-        colliders={rapierColliderFor(object.physics)}
+        colliders={collisionsEnabled ? rapierColliderFor(object.physics) : false}
         position={object.transform.position}
         rotation={object.transform.rotation}
         scale={object.transform.scale}
@@ -190,26 +196,77 @@ function ImportedSceneObject({ object, isSelected, onDragStateChange }) {
           onMouseUp={endEditorDrag}
         />
       )}
+
+      {isHighlighted && <ObjectHighlight object={object} />}
     </>
   );
 }
 
 function ImportedPhysicsScene({ sceneObjects, selectedObjectId, onDragStateChange }) {
   const gravityEnabled = useStore((state) => state.gravityEnabled);
+  const collisionsEnabled = useStore((state) => state.collisionsEnabled);
+  const highlightedObjectId = useStore((state) => state.highlightedObjectId);
 
   return (
     <Physics gravity={gravityEnabled ? [0, -9.81, 0] : [0, 0, 0]}>
-      <GroundCollider sceneObjects={sceneObjects} />
+      {collisionsEnabled && <GroundCollider sceneObjects={sceneObjects} />}
       {sceneObjects.map((object) => (
         <ImportedSceneObject
           key={object.id}
           object={object}
           isSelected={selectedObjectId === object.id}
+          isHighlighted={highlightedObjectId === object.id}
+          collisionsEnabled={collisionsEnabled}
           onDragStateChange={onDragStateChange}
         />
       ))}
     </Physics>
   );
+}
+
+function ObjectHighlight({ object }) {
+  const dimensions = object.dimensions?.map((value) => Math.max(value, 0.12)) ?? [1, 1, 1];
+  return (
+    <mesh
+      position={object.transform.position}
+      rotation={object.transform.rotation}
+      scale={object.transform.scale}
+      renderOrder={20}
+    >
+      <boxGeometry args={dimensions} />
+      <meshBasicMaterial color="#00e5ca" wireframe transparent opacity={0.9} depthTest={false} />
+    </mesh>
+  );
+}
+
+function GeneratedAssetPlaceholders({ tasks, sceneObjects }) {
+  return tasks
+    .filter(isGeneratedTaskPlaceholderVisible)
+    .map((task) => {
+      const position = placementPositionForTask(task, sceneObjects);
+      return (
+        <group key={task.taskId ?? task.prompt} position={position}>
+          <mesh>
+            <boxGeometry args={[0.5, 0.5, 0.5]} />
+            <meshStandardMaterial color="#00e5ca" transparent opacity={0.22} wireframe />
+          </mesh>
+          <Html center position={[0, 0.45, 0]} distanceFactor={8}>
+            <div style={{
+              padding: '3px 6px',
+              border: '1px solid rgba(0, 229, 202, 0.65)',
+              borderRadius: 3,
+              background: 'rgba(17, 17, 17, 0.85)',
+              color: '#d7fff8',
+              fontFamily: 'Inter, system-ui, sans-serif',
+              fontSize: 10,
+              whiteSpace: 'nowrap',
+            }}>
+              {task.prompt ?? task.sourcePrompt}: {generatedTaskDisplayStatus(task)}
+            </div>
+          </Html>
+        </group>
+      );
+    });
 }
 
 export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
@@ -218,6 +275,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const selectedObjectId = useStore((state) => state.selectedObjectId);
   const perspective = useStore((state) => state.perspective);
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
+  const generatedTasks = useStore((state) => state.generatedTasks);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
 
   return (
@@ -267,6 +325,8 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
           onDragStateChange={setIsTransforming}
         />
       )}
+
+      <GeneratedAssetPlaceholders tasks={generatedTasks} sceneObjects={sceneObjects} />
 
       <OrbitControls
         makeDefault

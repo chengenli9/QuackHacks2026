@@ -48,17 +48,32 @@ export class AssetGenerationService {
     const cached = this.generatedAssetCache.get(taskId);
 
     if (cached) {
-      return cached;
+      if (
+        cached.provider !== "meshy" ||
+        (cached.cachedGlbUrl && this.generatedAssetCache.hasModelFile(cached.id))
+      ) {
+        return cached;
+      }
+
+      const recached = await this.generatedAssetCache.saveRemoteModel(cached);
+      this.taskStore.updateGeneratedAsset(recached);
+      return recached;
     }
 
     const asset = generatedAssetSchema.parse(await this.assetGenerator.getModel(taskId));
-    this.generatedAssetCache.save(asset);
-    this.taskStore.updateGeneratedAsset(asset);
-    return asset;
+    const cachedAsset = await this.generatedAssetCache.saveRemoteModel(asset);
+    this.taskStore.updateGeneratedAsset(cachedAsset);
+    return cachedAsset;
   }
 
   getFallbackAsset(request: FallbackAssetRequest): GeneratedAsset {
     const input = fallbackAssetRequestSchema.parse(request);
     return this.generatedAssetCache.save(this.localAssetProvider.getFallbackAsset(input));
+  }
+
+  getCachedModelPath(taskId: string): string | undefined {
+    return this.generatedAssetCache.hasModelFile(taskId)
+      ? this.generatedAssetCache.modelFilePath(taskId)
+      : undefined;
   }
 }

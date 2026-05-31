@@ -327,4 +327,7 @@
   font-family: var(--font-ui);
   font-size: var(--font-size-xs);
   color: var(--text-primary);
+  max-width: 58%;
+  text-align: right;
+  overflow-wrap: anywhere;
 }

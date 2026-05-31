@@ -1,5 +1,6 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { configuredApiBaseUrl } from './apiClient.js';
+import { applyManifestToSceneObjects } from './manifestImport.js';
 import { createSceneObjectRegistry } from './sceneObjects.js';
 import { requestVisualPhysicsEstimate } from './objectEstimatorClient.js';
 import { dataUrlToImagePayload, renderObjectPreviewToDataUrl } from './objectPreview.js';
@@ -19,6 +20,7 @@ export async function loadGlbIntoScene({
   addGlbImportWarning,
   sourcePrompt,
   placement,
+  manifest,
 }) {
   const loader = new GLTFLoader();
   setGlbImportStatus('loading');
@@ -28,7 +30,7 @@ export async function loadGlbIntoScene({
   const existingIds = sceneObjects.map((object) => object.id);
   const registry = createSceneObjectRegistry(gltf.scene, { sourceFileName: fileName, existingIds });
   const placedObjects = applyGeneratedPlacement(registry.objects, sceneObjects, placement);
-  const objects = placedObjects.map((object) => ({
+  const objectsWithSource = placedObjects.map((object) => ({
     ...object,
     sourcePrompt,
     source: {
@@ -36,13 +38,17 @@ export async function loadGlbIntoScene({
       prompt: sourcePrompt,
     },
   }));
+  const manifestResult = manifest
+    ? applyManifestToSceneObjects(objectsWithSource, manifest)
+    : { objects: objectsWithSource, warnings: [] };
+  const objects = manifestResult.objects;
 
-  addImportedScene({ fileName, objects, warnings: registry.warnings });
+  addImportedScene({ fileName, objects, warnings: [...registry.warnings, ...manifestResult.warnings] });
 
   const targets = objects.filter((object) => object.physics.needsVisualEstimate || sourcePrompt);
   if (targets.length === 0) {
     setVlmEstimateStatus('complete');
-    return;
+    return objects;
   }
 
   setVlmEstimateStatus('estimating');
@@ -64,6 +70,7 @@ export async function loadGlbIntoScene({
     }
   }
   setVlmEstimateStatus(failed ? 'error' : 'complete');
+  return objects;
 }
 
 function applyGeneratedPlacement(objects, sceneObjects, placement) {

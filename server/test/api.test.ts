@@ -178,8 +178,16 @@ describe("backend API", () => {
   });
 
   it("returns generated asset task status and model metadata", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
     const generator = new FakeAssetGenerator();
-    app = await createApp({ assetGenerator: generator });
+    app = await createApp({
+      assetGenerator: generator,
+      generatedAssetStorageDir: mkdtempSync(join(tmpdir(), "api-generated-assets-")),
+      publicBaseUrl: "http://localhost:8787",
+      fetch: vi.fn(async () => new Response(Buffer.from("glb"), { status: 200 }))
+    });
 
     const status = await app.inject({
       method: "GET",
@@ -203,15 +211,27 @@ describe("backend API", () => {
       id: "task_123",
       provider: "meshy",
       sourcePrompt: "rubber duck",
-      glbUrl: "https://assets.example/task_123.glb",
+      glbUrl: "http://localhost:8787/api/generated-assets/task_123/model.glb",
+      cachedGlbUrl: "http://localhost:8787/api/generated-assets/task_123/model.glb",
+      originalGlbUrl: "https://assets.example/task_123.glb",
       thumbnailUrl: "https://assets.example/task_123.png",
-      metadata: { providerTaskId: "task_123" }
+      metadata: {
+        providerTaskId: "task_123",
+        originalGlbUrl: "https://assets.example/task_123.glb"
+      }
     });
   });
 
   it("returns deterministic local fallback assets only through explicit fallback route", async () => {
+    const { mkdtempSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const fallbackAssetDir = mkdtempSync(join(tmpdir(), "api-fallback-assets-"));
+    writeFileSync(join(fallbackAssetDir, "duck.glb"), Buffer.from("duck"));
+
     app = await createApp({
       assetGenerator: new FakeAssetGenerator(),
+      fallbackAssetDir,
       publicBaseUrl: "http://localhost:8787"
     });
 

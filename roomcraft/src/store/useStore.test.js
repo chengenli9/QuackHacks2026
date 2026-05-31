@@ -73,3 +73,36 @@ test('scene object editor actions update transform, material, physics, and gravi
   assert.equal(object.physicsRevision, 1);
   assert.equal(state.gravityEnabled, true);
 });
+
+test('project reset clears imported and generated demo state without leaving editor', () => {
+  useStore.setState({
+    currentView: 'editor',
+    importedGlbFileName: 'scene.glb',
+    manifestFileName: 'manifest.json',
+    manifestStatus: 'ready',
+    manifestWarnings: ['warning'],
+    sceneObjects: [{ id: 'duck_01', label: 'duck' }],
+    generatedTasks: [{ taskId: 'task_1', status: 'ready' }],
+    selectedObjectId: 'duck_01',
+    highlightedObjectId: 'duck_01',
+    gravityEnabled: true,
+    collisionsEnabled: false,
+    chatMessages: [{ id: 99, sender: 'user', text: 'changed' }],
+  });
+
+  useStore.getState().resetProject();
+
+  const state = useStore.getState();
+  assert.equal(state.currentView, 'editor');
+  assert.equal(state.importedGlbFileName, null);
+  assert.equal(state.manifestFileName, null);
+  assert.equal(state.manifestStatus, 'idle');
+  assert.deepEqual(state.manifestWarnings, []);
+  assert.deepEqual(state.sceneObjects, []);
+  assert.deepEqual(state.generatedTasks, []);
+  assert.equal(state.selectedObjectId, 'Room_Mesh');
+  assert.equal(state.highlightedObjectId, null);
+  assert.equal(state.gravityEnabled, false);
+  assert.equal(state.collisionsEnabled, true);
+  assert.equal(state.chatMessages[0].sender, 'ai');
+});

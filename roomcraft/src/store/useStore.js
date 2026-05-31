@@ -7,35 +7,65 @@ import {
   updateObjectPhysics,
   updateObjectTransform,
 } from '../lib/sceneState.js';
+import { applyManifestToSceneObjects } from '../lib/manifestImport.js';
+
+const DEFAULT_CHAT_MESSAGES = [
+  { id: 1, sender: 'ai', text: 'Import a GLB scene, then ask me to edit objects or add generated assets.' },
+];
+
+const resettableProjectState = () => ({
+  leftPanelTab: 'import',
+  chatSubTab: 'prompt',
+  activeTool: 'select',
+  viewMode: 'material',
+  perspective: 'Perspective',
+  overlaysEnabled: true,
+  gravityEnabled: false,
+  collisionsEnabled: true,
+  exportRequestedAt: null,
+  selectedObjectId: 'Room_Mesh',
+  expandedNodes: ['Scene', 'Room_Mesh', 'Lights'],
+  glbImportRequestId: 0,
+  importedGlbFileName: null,
+  glbImportStatus: 'idle',
+  glbImportError: null,
+  glbImportWarnings: [],
+  manifestFileName: null,
+  manifestStatus: 'idle',
+  manifestWarnings: [],
+  vlmEstimateStatus: 'idle',
+  sceneObjects: [],
+  generatedTasks: [],
+  highlightedObjectId: null,
+  demoSceneUrl: '/chaoman.glb',
+  sourceImageUrl: null,
+  chatMessages: DEFAULT_CHAT_MESSAGES,
+});
 
 const useStore = create((set) => ({
   // App navigation
   currentView: 'landing',
   setCurrentView: (view) => set({ currentView: view }),
 
+  ...resettableProjectState(),
+
   // Panel state
-  leftPanelTab: 'import',
-  chatSubTab: 'prompt',
   setLeftPanelTab: (tab) => set({ leftPanelTab: tab }),
   setChatSubTab: (tab) => set({ chatSubTab: tab }),
 
   // Viewport
-  activeTool: 'select',
-  viewMode: 'material',
-  perspective: 'Perspective',
-  overlaysEnabled: true,
-  gravityEnabled: false,
-  exportRequestedAt: null,
   setActiveTool: (tool) => set({ activeTool: tool }),
   setViewMode: (mode) => set({ viewMode: mode }),
   setPerspective: (perspective) => set({ perspective }),
   toggleOverlays: () => set((state) => ({ overlaysEnabled: !state.overlaysEnabled })),
   setGravityEnabled: (gravityEnabled) => set({ gravityEnabled }),
+  setCollisionsEnabled: (collisionsEnabled) => set({ collisionsEnabled }),
+  requestSceneExport: () =>
+    set((state) => ({ exportRequestedAt: (state.exportRequestedAt ?? 0) + 1 })),
 
   // Hierarchy
-  selectedObjectId: 'Room_Mesh',
-  expandedNodes: ['Scene', 'Room_Mesh', 'Lights'],
   setSelectedObject: (id) => set({ selectedObjectId: id }),
+  setHighlightedObject: (id) => set({ highlightedObjectId: id }),
   toggleNode: (id) =>
     set((state) => ({
       expandedNodes: state.expandedNodes.includes(id)
@@ -44,13 +74,6 @@ const useStore = create((set) => ({
     })),
 
   // Imported GLB scene
-  glbImportRequestId: 0,
-  importedGlbFileName: null,
-  glbImportStatus: 'idle',
-  glbImportError: null,
-  glbImportWarnings: [],
-  vlmEstimateStatus: 'idle',
-  sceneObjects: [],
   requestGlbImport: () =>
     set((state) => ({
       glbImportRequestId: state.glbImportRequestId + 1,
@@ -69,6 +92,7 @@ const useStore = create((set) => ({
       glbImportError: null,
       glbImportWarnings: warnings,
       selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+      highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
       expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
     })),
   addImportedScene: ({ fileName, objects, warnings = [] }) =>
@@ -79,7 +103,24 @@ const useStore = create((set) => ({
       glbImportError: null,
       glbImportWarnings: [...state.glbImportWarnings, ...warnings],
       selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+      highlightedObjectId: objects[0]?.id ?? state.highlightedObjectId,
       expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+    })),
+  mergeManifestMetadata: ({ fileName, manifest }) =>
+    set((state) => {
+      const result = applyManifestToSceneObjects(state.sceneObjects, manifest);
+      return {
+        sceneObjects: result.objects.map(normalizeSceneObject),
+        manifestFileName: fileName,
+        manifestStatus: 'ready',
+        manifestWarnings: result.warnings,
+      };
+    }),
+  setManifestStatus: (status, warnings = [], fileName = null) =>
+    set((state) => ({
+      manifestStatus: status,
+      manifestWarnings: warnings,
+      manifestFileName: fileName ?? state.manifestFileName,
     })),
   mergeSceneObjectEstimate: (objectId, estimate) =>
     set((state) => ({
@@ -109,13 +150,16 @@ const useStore = create((set) => ({
       glbImportStatus: 'idle',
       glbImportError: null,
       glbImportWarnings: [],
+      manifestFileName: null,
+      manifestStatus: 'idle',
+      manifestWarnings: [],
       vlmEstimateStatus: 'idle',
       sceneObjects: [],
       selectedObjectId: 'Room_Mesh',
+      highlightedObjectId: null,
     }),
 
   // Generated assets
-  generatedTasks: [],
   upsertGeneratedTask: (task) =>
     set((state) => {
       const existing = state.generatedTasks.some((item) => item.taskId === task.taskId);
@@ -127,9 +171,6 @@ const useStore = create((set) => ({
     }),
 
   // Chat
-  chatMessages: [
-    { id: 1, sender: 'ai', text: 'Import a GLB scene, then ask me to edit objects or add generated assets.' },
-  ],
   addChatMessage: (msg) =>
     set((state) => ({ chatMessages: [...state.chatMessages, msg] })),
   updateLastMessage: (msg) =>
@@ -138,6 +179,12 @@ const useStore = create((set) => ({
       msgs[msgs.length - 1] = msg;
       return { chatMessages: msgs };
     }),
+  resetProject: () =>
+    set((state) => ({
+      currentView: state.currentView === 'landing' ? 'landing' : 'editor',
+      ...resettableProjectState(),
+      glbImportRequestId: state.glbImportRequestId,
+    })),
 }));
 
 export default useStore;

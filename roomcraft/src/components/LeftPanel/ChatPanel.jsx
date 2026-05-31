@@ -10,6 +10,7 @@ import {
 } from '../../lib/apiClient';
 import { fallbackPromptForAssetKey } from '../../lib/fallbackAssets';
 import { loadGlbIntoScene } from '../../lib/glbImport';
+import { exportSceneArtifacts } from '../../lib/sceneExport';
 import styles from './LeftPanel.module.css';
 
 function errorMessage(error) {
@@ -17,6 +18,11 @@ function errorMessage(error) {
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const SCRIPTED_PROMPTS = [
+  'add a rubber duck on the coffee table',
+  'make the duck bouncier',
+  'export scene',
+];
 
 export default function ChatPanel() {
   const {
@@ -30,6 +36,7 @@ export default function ChatPanel() {
     setVlmEstimateStatus,
     mergeSceneObjectEstimate,
     addGlbImportWarning,
+    setHighlightedObject,
   } = useStore();
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -45,10 +52,10 @@ export default function ChatPanel() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const handleSend = async () => {
-    const text = inputValue.trim();
+  const handleSend = async (overrideText = null) => {
+    const text = (overrideText ?? inputValue).trim();
     if (!text || isSending) return;
-    setInputValue('');
+    if (!overrideText) setInputValue('');
     setIsSending(true);
 
     addChatMessage({ id: nextMessageId(), sender: 'user', text });
@@ -79,6 +86,11 @@ export default function ChatPanel() {
 
     if (operation.action === 'add_local_object') {
       await handleLocalAssetOperation(operation);
+      return;
+    }
+
+    if (operation.action === 'export_scene') {
+      await handleExportOperation();
       return;
     }
 
@@ -113,6 +125,7 @@ export default function ChatPanel() {
           prompt: operation.prompt,
           placement: operation.placement,
           fallbackAssetKey: operation.fallbackAssetKey,
+          status: operation.fallbackAssetKey ? 'fallback_available' : 'failed',
         });
         addChatMessage({
           id: nextMessageId(),
@@ -132,9 +145,10 @@ export default function ChatPanel() {
         prompt: operation.prompt,
         placement: operation.placement,
         fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'importing_glb',
       });
 
-      await loadGlbIntoScene({
+      const objects = await loadGlbIntoScene({
         sourceUrl: asset.glbUrl,
         fileName: `${asset.id}.glb`,
         sceneObjects: useStore.getState().sceneObjects,
@@ -145,6 +159,18 @@ export default function ChatPanel() {
         addGlbImportWarning,
         sourcePrompt: asset.sourcePrompt,
         placement: operation.placement,
+      });
+      const selectedId = objects[0]?.id ?? null;
+      if (selectedId) setHighlightedObject(selectedId);
+      upsertGeneratedTask({
+        ...task,
+        ...status,
+        ...asset,
+        prompt: operation.prompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'ready',
+        importedObjectIds: objects.map((object) => object.id),
       });
 
       addChatMessage({
@@ -158,7 +184,7 @@ export default function ChatPanel() {
         prompt: operation.prompt,
         placement: operation.placement,
         fallbackAssetKey: operation.fallbackAssetKey,
-        status: 'failed',
+        status: operation.fallbackAssetKey ? 'fallback_available' : 'failed',
         error: errorMessage(error),
       });
       updateLastMessage({
@@ -194,10 +220,10 @@ export default function ChatPanel() {
         prompt: sourcePrompt,
         placement: operation.placement,
         fallbackAssetKey: operation.fallbackAssetKey,
-        status: 'fallback-ready',
+        status: 'importing_glb',
       });
 
-      await loadGlbIntoScene({
+      const objects = await loadGlbIntoScene({
         sourceUrl: asset.glbUrl,
         fileName: `${asset.id}.glb`,
         sceneObjects: useStore.getState().sceneObjects,
@@ -208,6 +234,17 @@ export default function ChatPanel() {
         addGlbImportWarning,
         sourcePrompt: asset.sourcePrompt,
         placement: operation.placement,
+      });
+      const selectedId = objects[0]?.id ?? null;
+      if (selectedId) setHighlightedObject(selectedId);
+      upsertGeneratedTask({
+        taskId,
+        ...asset,
+        prompt: sourcePrompt,
+        placement: operation.placement,
+        fallbackAssetKey: operation.fallbackAssetKey,
+        status: 'ready',
+        importedObjectIds: objects.map((object) => object.id),
       });
 
       updateLastMessage({
@@ -233,6 +270,23 @@ export default function ChatPanel() {
     }
   };
 
+  const handleExportOperation = async () => {
+    try {
+      await exportSceneArtifacts({ sceneObjects: useStore.getState().sceneObjects });
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: 'Exported scene.glb and scene.physics.json.',
+      });
+    } catch (error) {
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `Export failed: ${errorMessage(error)}.`,
+      });
+    }
+  };
+
   return (
     <div className={styles.chatPanel}>
       <div className={styles.chatMessages}>
@@ -248,6 +302,14 @@ export default function ChatPanel() {
           </div>
         ))}
         <div ref={messagesEndRef} />
+      </div>
+
+      <div className={styles.scriptedPrompts}>
+        {SCRIPTED_PROMPTS.map((prompt) => (
+          <button key={prompt} onClick={() => void handleSend(prompt)} disabled={isSending}>
+            {prompt}
+          </button>
+        ))}
       </div>
 
       <div className={styles.chatInputRow}>
@@ -301,7 +363,7 @@ function labelForAppliedOperation(operation) {
     case 'relabel_object':
       return 'Renamed the object.';
     case 'export_scene':
-      return 'Export requested.';
+      return 'Exporting scene files.';
     default:
       return 'Applied scene change.';
   }
