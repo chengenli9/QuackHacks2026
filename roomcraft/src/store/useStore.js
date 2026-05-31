@@ -1,5 +1,18 @@
 import { create } from 'zustand';
 
+const DEFAULT_TRANSFORMS = {
+  Room_Mesh: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Floor: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Walls: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Ceiling: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Lights: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Ambient: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Sun: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Camera: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  Scene: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+  ChaoMan: { position: [0, 0.85, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+};
+
 const useStore = create((set) => ({
   // App navigation
   currentView: 'landing',
@@ -28,6 +41,50 @@ const useStore = create((set) => ({
         : [...state.expandedNodes, id],
     })),
 
+  // Transform state for all objects (virtual + real)
+  sceneObjectTransforms: { ...DEFAULT_TRANSFORMS },
+
+  initObjectTransform: (id, position, rotation, scale) =>
+    set((state) => {
+      if (state.sceneObjectTransforms[id]) return state;
+      return {
+        sceneObjectTransforms: {
+          ...state.sceneObjectTransforms,
+          [id]: { position, rotation, scale },
+        },
+      };
+    }),
+
+  updateObjectTransform: (id, partial) =>
+    set((state) => {
+      const current = state.sceneObjectTransforms[id] || {
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+      };
+      const next = { ...current };
+      if (partial.position !== undefined) next.position = [...partial.position];
+      if (partial.rotation !== undefined) next.rotation = [...partial.rotation];
+      if (partial.scale !== undefined) next.scale = [...partial.scale];
+      return {
+        sceneObjectTransforms: {
+          ...state.sceneObjectTransforms,
+          [id]: next,
+        },
+      };
+    }),
+
+  batchInitObjectTransforms: (entries) =>
+    set((state) => {
+      const next = { ...state.sceneObjectTransforms };
+      for (const [id, transform] of Object.entries(entries)) {
+        if (!next[id]) {
+          next[id] = transform;
+        }
+      }
+      return { sceneObjectTransforms: next };
+    }),
+
   // Imported GLB scene
   glbImportRequestId: 0,
   importedGlbFileName: null,
@@ -47,25 +104,47 @@ const useStore = create((set) => ({
   addGlbImportWarning: (warning) =>
     set((state) => ({ glbImportWarnings: [...state.glbImportWarnings, warning] })),
   setImportedScene: ({ fileName, objects, warnings = [] }) =>
-    set((state) => ({
-      importedGlbFileName: fileName,
-      sceneObjects: objects,
-      glbImportStatus: 'ready',
-      glbImportError: null,
-      glbImportWarnings: warnings,
-      selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
-      expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
-    })),
+    set((state) => {
+      const newTransforms = { ...state.sceneObjectTransforms };
+      for (const obj of objects) {
+        newTransforms[obj.id] = {
+          position: obj.center ? [...obj.center] : [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: obj.dimensions ? obj.dimensions.map((d) => (d > 0.001 ? d : 1)) : [1, 1, 1],
+        };
+      }
+      return {
+        importedGlbFileName: fileName,
+        sceneObjects: objects,
+        glbImportStatus: 'ready',
+        glbImportError: null,
+        glbImportWarnings: warnings,
+        selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+        expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+        sceneObjectTransforms: newTransforms,
+      };
+    }),
   addImportedScene: ({ fileName, objects, warnings = [] }) =>
-    set((state) => ({
-      importedGlbFileName: fileName,
-      sceneObjects: [...state.sceneObjects, ...objects],
-      glbImportStatus: 'ready',
-      glbImportError: null,
-      glbImportWarnings: [...state.glbImportWarnings, ...warnings],
-      selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
-      expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
-    })),
+    set((state) => {
+      const newTransforms = { ...state.sceneObjectTransforms };
+      for (const obj of objects) {
+        newTransforms[obj.id] = {
+          position: obj.center ? [...obj.center] : [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: obj.dimensions ? obj.dimensions.map((d) => (d > 0.001 ? d : 1)) : [1, 1, 1],
+        };
+      }
+      return {
+        importedGlbFileName: fileName,
+        sceneObjects: [...state.sceneObjects, ...objects],
+        glbImportStatus: 'ready',
+        glbImportError: null,
+        glbImportWarnings: [...state.glbImportWarnings, ...warnings],
+        selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+        expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+        sceneObjectTransforms: newTransforms,
+      };
+    }),
   mergeSceneObjectEstimate: (objectId, estimate) =>
     set((state) => ({
       sceneObjects: state.sceneObjects.map((object) =>
