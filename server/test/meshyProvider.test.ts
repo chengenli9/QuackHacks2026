@@ -34,6 +34,7 @@ describe("MeshyProvider", () => {
     });
     expect(JSON.parse(String(init?.body))).toEqual({
       mode: "preview",
+      ai_model: "latest",
       prompt: "rubber duck, cartoon style",
       target_formats: ["glb"]
     });
@@ -44,41 +45,89 @@ describe("MeshyProvider", () => {
     });
   });
 
-  it("normalizes Meshy task states and exposes GLB URLs", async () => {
-    const fetch = vi.fn(async () =>
-      jsonResponse({
-        id: "meshy_task_1",
+  it("starts a textured refine task after preview and exposes refined GLB URLs", async () => {
+    const fetch = vi.fn(async (url, init) => {
+      if (String(url).endsWith("/openapi/v2/text-to-3d") && init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        return jsonResponse({ result: body.mode === "preview" ? "preview_task_1" : "refine_task_1" });
+      }
+      if (String(url).endsWith("/openapi/v2/text-to-3d/preview_task_1")) {
+        return jsonResponse({
+          id: "preview_task_1",
+          type: "text-to-3d-preview",
+          status: "SUCCEEDED",
+          progress: 100,
+          prompt: "rubber duck",
+          task_error: { message: "" }
+        });
+      }
+      return jsonResponse({
+        id: "refine_task_1",
+        type: "text-to-3d-refine",
         status: "SUCCEEDED",
         progress: 100,
         prompt: "rubber duck",
         thumbnail_url: "https://assets.example/preview.png",
         model_urls: {
-          glb: "https://assets.example/model.glb"
+          glb: "https://assets.example/textured.glb"
         },
         task_error: { message: "" }
-      })
-    );
+      });
+    });
     const provider = new MeshyProvider({
       apiKey: "secret",
       baseUrl: "https://api.meshy.ai",
       fetch
     });
 
-    await expect(provider.getTask("meshy_task_1")).resolves.toEqual({
-      taskId: "meshy_task_1",
-      status: "succeeded",
-      progress: 100,
-      modelUrl: "https://assets.example/model.glb"
+    await provider.generateFromText({
+      prompt: "rubber duck",
+      targetFormat: "glb"
     });
 
-    await expect(provider.getModel("meshy_task_1")).resolves.toEqual({
-      id: "meshy_task_1",
+    await expect(provider.getTask("preview_task_1")).resolves.toEqual({
+      taskId: "preview_task_1",
+      status: "running",
+      progress: 50
+    });
+
+    const [, refineInit] = fetch.mock.calls.find(([, init]) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      return body?.mode === "refine";
+    }) ?? [];
+    expect(JSON.parse(String(refineInit?.body))).toEqual({
+      mode: "refine",
+      ai_model: "latest",
+      preview_task_id: "preview_task_1",
+      texture_prompt: "rubber duck",
+      enable_pbr: true,
+      hd_texture: true,
+      remove_lighting: true,
+      target_formats: ["glb"],
+      auto_size: true,
+      origin_at: "bottom"
+    });
+
+    await expect(provider.getTask("preview_task_1")).resolves.toEqual({
+      taskId: "preview_task_1",
+      status: "succeeded",
+      progress: 100,
+      modelUrl: "https://assets.example/textured.glb"
+    });
+
+    await expect(provider.getModel("preview_task_1")).resolves.toEqual({
+      id: "preview_task_1",
       provider: "meshy",
       sourcePrompt: "rubber duck",
-      glbUrl: "https://assets.example/model.glb",
+      glbUrl: "https://assets.example/textured.glb",
       thumbnailUrl: "https://assets.example/preview.png",
       metadata: {
-        meshyStatus: "SUCCEEDED"
+        meshyStatus: "SUCCEEDED",
+        meshyStage: "refine",
+        previewTaskId: "preview_task_1",
+        refineTaskId: "refine_task_1",
+        textured: true,
+        pbr: true
       }
     });
   });
@@ -100,6 +149,7 @@ describe("MeshyProvider", () => {
     const [, init] = fetch.mock.calls[0];
     expect(JSON.parse(String(init?.body))).toEqual({
       mode: "preview",
+      ai_model: "latest",
       prompt: "wooden crate",
       model_type: "lowpoly",
       target_formats: ["glb"]
@@ -123,6 +173,7 @@ describe("MeshyProvider", () => {
     const [, init] = fetch.mock.calls[0];
     expect(JSON.parse(String(init?.body))).toEqual({
       mode: "preview",
+      ai_model: "latest",
       prompt: "neon sci-fi apartment, complete 3D environment scene, cohesive floor and room-scale props",
       target_formats: ["glb"]
     });
@@ -143,7 +194,7 @@ describe("MeshyProvider", () => {
     ).rejects.toThrow("Meshy request failed with status 402: Insufficient credits");
   });
 
-  it("requires a GLB URL before returning generated model metadata", async () => {
+  it("requires a textured refine task before returning generated model metadata", async () => {
     const fetch = vi.fn(async () =>
       jsonResponse({
         id: "meshy_task_1",
@@ -160,7 +211,45 @@ describe("MeshyProvider", () => {
     });
 
     await expect(provider.getModel("meshy_task_1")).rejects.toThrow(
-      "Meshy task meshy_task_1 has no GLB URL yet"
+      "Meshy task meshy_task_1 has no textured refine task yet"
     );
+  });
+
+  it("keeps refined tasks running until the textured GLB URL is present", async () => {
+    const fetch = vi.fn(async (url, init) => {
+      if (String(url).endsWith("/openapi/v2/text-to-3d") && init?.method === "POST") {
+        const body = JSON.parse(String(init.body));
+        return jsonResponse({ result: body.mode === "preview" ? "preview_task_1" : "refine_task_1" });
+      }
+      if (String(url).endsWith("/openapi/v2/text-to-3d/preview_task_1")) {
+        return jsonResponse({
+          id: "preview_task_1",
+          status: "SUCCEEDED",
+          progress: 100,
+          prompt: "rubber duck"
+        });
+      }
+      return jsonResponse({
+        id: "refine_task_1",
+        status: "SUCCEEDED",
+        progress: 100,
+        prompt: "rubber duck",
+        model_urls: {}
+      });
+    });
+    const provider = new MeshyProvider({
+      apiKey: "secret",
+      baseUrl: "https://api.meshy.ai",
+      fetch
+    });
+
+    await provider.generateFromText({ prompt: "rubber duck", targetFormat: "glb" });
+    await provider.getTask("preview_task_1");
+
+    await expect(provider.getTask("preview_task_1")).resolves.toEqual({
+      taskId: "preview_task_1",
+      status: "running",
+      progress: 100
+    });
   });
 });

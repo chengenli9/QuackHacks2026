@@ -22,6 +22,7 @@ type MeshyProviderOptions = {
 
 type MeshyTask = {
   id: string;
+  type?: string;
   status?: string;
   progress?: number;
   prompt?: string;
@@ -38,6 +39,8 @@ export class MeshyProvider implements AssetGenerator {
   private readonly apiKey: string;
   private readonly baseUrl: string;
   private readonly fetch: FetchLike;
+  private readonly refineTaskByPreviewTaskId = new Map<string, string>();
+  private readonly sourcePromptByPreviewTaskId = new Map<string, string>();
 
   constructor(options: MeshyProviderOptions) {
     if (!options.apiKey.trim()) {
@@ -61,6 +64,8 @@ export class MeshyProvider implements AssetGenerator {
       throw new HttpError(502, "MeshyInvalidResponse", "Meshy did not return a task id");
     }
 
+    this.sourcePromptByPreviewTaskId.set(response.result, this.promptForMeshy(input));
+
     return assetGenerationTaskSchema.parse({
       taskId: response.result,
       provider: "meshy",
@@ -69,19 +74,55 @@ export class MeshyProvider implements AssetGenerator {
   }
 
   async getTask(taskId: string): Promise<AssetGenerationTaskStatus> {
+    const refineTaskId = this.refineTaskByPreviewTaskId.get(taskId);
+
+    if (refineTaskId) {
+      const refineTask = await this.retrieveTask(refineTaskId);
+      const refineStatus = this.normalizeRefineStatus(refineTask);
+      return assetGenerationTaskStatusSchema.parse({
+        taskId,
+        status: refineStatus,
+        progress: this.refineProgress(refineTask.progress),
+        modelUrl: refineStatus === "succeeded" ? refineTask.model_urls?.glb : undefined,
+        error: refineTask.task_error?.message || undefined
+      });
+    }
+
     const task = await this.retrieveTask(taskId);
+    const previewStatus = this.normalizeStatus(task.status);
+
+    if (previewStatus !== "succeeded") {
+      return assetGenerationTaskStatusSchema.parse({
+        taskId: task.id,
+        status: previewStatus,
+        progress: this.previewProgress(task.progress),
+        modelUrl: undefined,
+        error: task.task_error?.message || undefined
+      });
+    }
+
+    const createdRefineTaskId = await this.createRefineTask(taskId, task.prompt ?? taskId);
+    this.refineTaskByPreviewTaskId.set(taskId, createdRefineTaskId);
 
     return assetGenerationTaskStatusSchema.parse({
-      taskId: task.id,
-      status: this.normalizeStatus(task.status),
-      progress: task.progress,
-      modelUrl: task.model_urls?.glb,
-      error: task.task_error?.message || undefined
+      taskId,
+      status: "running",
+      progress: 50
     });
   }
 
   async getModel(taskId: string): Promise<GeneratedAsset> {
-    const task = await this.retrieveTask(taskId);
+    const refineTaskId = this.refineTaskByPreviewTaskId.get(taskId);
+
+    if (!refineTaskId) {
+      throw new HttpError(
+        409,
+        "GeneratedAssetNotReady",
+        `Meshy task ${taskId} has no textured refine task yet`
+      );
+    }
+
+    const task = await this.retrieveTask(refineTaskId);
     const glbUrl = task.model_urls?.glb;
 
     if (!glbUrl) {
@@ -93,13 +134,18 @@ export class MeshyProvider implements AssetGenerator {
     }
 
     return generatedAssetSchema.parse({
-      id: task.id,
+      id: taskId,
       provider: "meshy",
-      sourcePrompt: task.prompt ?? taskId,
+      sourcePrompt: this.sourcePromptByPreviewTaskId.get(taskId) ?? task.prompt ?? taskId,
       glbUrl,
       thumbnailUrl: task.thumbnail_url,
       metadata: {
-        meshyStatus: task.status ?? "UNKNOWN"
+        meshyStatus: task.status ?? "UNKNOWN",
+        meshyStage: "refine",
+        previewTaskId: taskId,
+        refineTaskId,
+        textured: true,
+        pbr: true
       }
     });
   }
@@ -108,6 +154,19 @@ export class MeshyProvider implements AssetGenerator {
     return this.requestJson<MeshyTask>(`/openapi/v2/text-to-3d/${encodeURIComponent(taskId)}`, {
       method: "GET"
     });
+  }
+
+  private async createRefineTask(previewTaskId: string, prompt: string): Promise<string> {
+    const response = await this.requestJson<{ result?: string }>("/openapi/v2/text-to-3d", {
+      method: "POST",
+      body: JSON.stringify(this.refineRequestBody(previewTaskId, prompt))
+    });
+
+    if (!response.result) {
+      throw new HttpError(502, "MeshyInvalidResponse", "Meshy did not return a refine task id");
+    }
+
+    return response.result;
   }
 
   private async requestJson<T>(path: string, init: RequestInit): Promise<T> {
@@ -165,10 +224,34 @@ export class MeshyProvider implements AssetGenerator {
   private previewRequestBody(input: TextAssetGenerationInput) {
     return {
       mode: "preview",
+      ai_model: "latest",
       prompt: this.promptForMeshy(input),
       ...(input.style === "lowpoly" ? { model_type: "lowpoly" } : {}),
       target_formats: ["glb"]
     };
+  }
+
+  private refineRequestBody(previewTaskId: string, prompt: string) {
+    return {
+      mode: "refine",
+      ai_model: "latest",
+      preview_task_id: previewTaskId,
+      texture_prompt: prompt,
+      enable_pbr: true,
+      hd_texture: true,
+      remove_lighting: true,
+      target_formats: ["glb"],
+      auto_size: true,
+      origin_at: "bottom"
+    };
+  }
+
+  private previewProgress(progress: number | undefined): number | undefined {
+    return typeof progress === "number" ? Math.min(50, Math.round(progress * 0.5)) : undefined;
+  }
+
+  private refineProgress(progress: number | undefined): number | undefined {
+    return typeof progress === "number" ? 50 + Math.round(progress * 0.5) : undefined;
   }
 
   private normalizeStatus(status: string | undefined): AssetGenerationTaskStatus["status"] {
@@ -185,5 +268,13 @@ export class MeshyProvider implements AssetGenerator {
       default:
         return "running";
     }
+  }
+
+  private normalizeRefineStatus(task: MeshyTask): AssetGenerationTaskStatus["status"] {
+    const status = this.normalizeStatus(task.status);
+    if (status === "succeeded" && !task.model_urls?.glb) {
+      return "running";
+    }
+    return status;
   }
 }
