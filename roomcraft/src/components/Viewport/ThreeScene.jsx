@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import {
   GizmoHelper,
   GizmoViewport,
@@ -10,7 +10,7 @@ import {
   OrbitControls,
   TransformControls,
 } from '@react-three/drei';
-import { Euler, PCFShadowMap, Quaternion, Vector3 } from 'three';
+import { Euler, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from 'three';
 import useStore from '../../store/useStore';
 import {
   editorGravityScale,
@@ -59,6 +59,16 @@ function CameraPositioner({ cameraTarget, perspective }) {
   }, [camera, cameraTarget, controls, perspective]);
 
   return null;
+}
+
+function SceneBackground({ background }) {
+  if (!background?.imageDataUrl) return null;
+  return <SceneBackgroundTexture imageUrl={background.imageDataUrl} />;
+}
+
+function SceneBackgroundTexture({ imageUrl }) {
+  const texture = useLoader(TextureLoader, imageUrl);
+  return <primitive object={texture} attach="background" />;
 }
 
 function GroundCollider({ sceneObjects }) {
@@ -114,14 +124,9 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
     body.setAngvel?.({ x: 0, y: 0, z: 0 }, true);
   };
 
-  const setPhysicsPausedForEditor = (paused) => {
-    bodyRef.current?.setGravityScale?.(editorGravityScale({ isEditorDragging: paused }), true);
-    stopPhysicsBody();
-  };
-
-  const commitTransform = () => {
+  const editorWorldPose = () => {
     const target = object.object3d;
-    if (!target) return;
+    if (!target) return null;
     target.updateWorldMatrix(true, false);
 
     const position = new Vector3();
@@ -132,16 +137,43 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
     target.getWorldScale(scale);
     const rotation = new Euler().setFromQuaternion(quaternion, 'XYZ');
 
+    return { position, quaternion, rotation, scale };
+  };
+
+  const syncBodyToEditorPose = (pose) => {
+    const body = bodyRef.current;
+    if (!body || !pose) return;
+    body.setTranslation?.({ x: pose.position.x, y: pose.position.y, z: pose.position.z }, true);
+    body.setRotation?.({
+      x: pose.quaternion.x,
+      y: pose.quaternion.y,
+      z: pose.quaternion.z,
+      w: pose.quaternion.w,
+    }, true);
+    stopPhysicsBody();
+  };
+
+  const setPhysicsPausedForEditor = (paused) => {
+    bodyRef.current?.setGravityScale?.(editorGravityScale({ isEditorDragging: paused }), true);
+    stopPhysicsBody();
+  };
+
+  const commitTransform = () => {
+    const target = object.object3d;
+    const pose = editorWorldPose();
+    if (!target || !pose) return null;
+
     target.position.set(0, 0, 0);
     target.rotation.set(0, 0, 0);
     target.scale.set(1, 1, 1);
 
     updateSceneObjectTransform(object.id, {
-      position: [position.x, position.y, position.z],
-      rotation: [rotation.x, rotation.y, rotation.z],
-      scale: [scale.x, scale.y, scale.z],
+      position: [pose.position.x, pose.position.y, pose.position.z],
+      rotation: [pose.rotation.x, pose.rotation.y, pose.rotation.z],
+      scale: [pose.scale.x, pose.scale.y, pose.scale.z],
     });
-    lastRuntimePositionRef.current = [position.x, position.y, position.z];
+    lastRuntimePositionRef.current = [pose.position.x, pose.position.y, pose.position.z];
+    return pose;
   };
 
   const beginEditorDrag = () => {
@@ -153,7 +185,8 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
 
   const endEditorDrag = () => {
     setPhysicsPausedForEditor(true);
-    commitTransform();
+    const pose = commitTransform();
+    syncBodyToEditorPose(pose);
     isEditorDraggingRef.current = false;
     setIsEditorDragging(false);
     setPhysicsPausedForEditor(false);
@@ -188,6 +221,7 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
           onPointerDown={selectThisObject}
           onClick={selectThisObject}
         />
+        <ObjectSelectionHitbox object={object} onSelect={selectThisObject} />
       </RigidBody>
 
       {showControls && (
@@ -201,6 +235,24 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
 
       {isHighlighted && <ObjectHighlight object={object} />}
     </>
+  );
+}
+
+function ObjectSelectionHitbox({ object, onSelect }) {
+  const dimensions = object.dimensions?.map((value) => Math.max(value, 0.18)) ?? [1, 1, 1];
+  const center = object.center ?? object.transform.position ?? [0, 0, 0];
+  const transformPosition = object.transform.position ?? [0, 0, 0];
+  const localCenter = center.map((value, index) => value - transformPosition[index]);
+
+  return (
+    <mesh
+      position={localCenter}
+      onPointerDown={onSelect}
+      onClick={onSelect}
+    >
+      <boxGeometry args={dimensions} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
   );
 }
 
@@ -234,6 +286,7 @@ function ObjectHighlight({ object }) {
       rotation={object.transform.rotation}
       scale={object.transform.scale}
       renderOrder={20}
+      raycast={() => null}
     >
       <boxGeometry args={dimensions} />
       <meshBasicMaterial color="#00e5ca" wireframe transparent opacity={0.9} depthTest={false} />
@@ -248,7 +301,7 @@ function GeneratedAssetPlaceholders({ tasks, sceneObjects }) {
       const position = placementPositionForTask(task, sceneObjects);
       return (
         <group key={task.taskId ?? task.prompt} position={position}>
-          <mesh>
+          <mesh raycast={() => null}>
             <boxGeometry args={[0.5, 0.5, 0.5]} />
             <meshStandardMaterial color="#00e5ca" transparent opacity={0.22} wireframe />
           </mesh>
@@ -278,8 +331,21 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const perspective = useStore((state) => state.perspective);
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
+  const highlightedObjectId = useStore((state) => state.highlightedObjectId);
+  const sceneBackground = useStore((state) => state.sceneBackground);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
+  const setHighlightedObject = useStore((state) => state.setHighlightedObject);
   const renderableSceneObjects = sceneObjects.filter((object) => object.object3d);
+
+  useEffect(() => {
+    if (!highlightedObjectId) return undefined;
+    const timeout = setTimeout(() => {
+      if (useStore.getState().highlightedObjectId === highlightedObjectId) {
+        setHighlightedObject(null);
+      }
+    }, 2500);
+    return () => clearTimeout(timeout);
+  }, [highlightedObjectId, setHighlightedObject]);
 
   return (
     <Canvas
@@ -289,6 +355,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
       style={{ background: '#444444' }}
       onPointerMissed={() => setSelectedObject('Room_Mesh')}
     >
+      <SceneBackground background={sceneBackground} />
       <ambientLight intensity={0.55} />
       <hemisphereLight intensity={0.85} color="#ffffff" groundColor="#4b5563" />
       <Environment preset="studio" />

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
 
 export type ServerConfig = {
   host: string;
@@ -10,6 +11,7 @@ export type ServerConfig = {
   meshyBaseUrl: string;
   geminiApiKey?: string;
   geminiModel: string;
+  geminiImageModel: string;
   geminiBaseUrl: string;
   openAiApiKey?: string;
   openAiModel: string;
@@ -53,6 +55,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
   meshyBaseUrl: env.MESHY_BASE_URL ?? "https://api.meshy.ai",
   geminiApiKey: env.GEMINI_API_KEY,
   geminiModel: env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL,
+  geminiImageModel: env.GEMINI_IMAGE_MODEL ?? DEFAULT_GEMINI_IMAGE_MODEL,
   geminiBaseUrl: env.GEMINI_BASE_URL ?? "https://generativelanguage.googleapis.com/v1beta",
   openAiApiKey: env.OPENAI_API_KEY,
   openAiModel: env.OPENAI_MODEL ?? "gpt-4.1-mini",

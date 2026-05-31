@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
+import { FallbackCommandParser } from "../src/services/fallbackCommandParser.js";
 import { parseSceneCommand } from "../src/services/commandParser.js";
 
 const sceneContext = {
   objects: [
-    { id: "duck_01", label: "rubber duck" },
-    { id: "table_01", label: "coffee table" }
+    {
+      id: "duck_01",
+      label: "rubber duck",
+      material: "rubber",
+      position: [0, 1, 0],
+      static: false
+    },
+    {
+      id: "table_01",
+      label: "coffee table",
+      category: "furniture",
+      material: "wood",
+      position: [0, 0, 0],
+      static: true
+    }
   ]
 };
 
@@ -50,5 +64,71 @@ describe("extended local command parser", () => {
         sceneContext
       })
     ).toEqual({ action: "relabel_object", target: "duck_01", label: "bath toy" });
+  });
+
+  it("parses collision and material editing commands", () => {
+    expect(
+      parseSceneCommand({
+        message: "turn collisions off",
+        sceneContext
+      })
+    ).toEqual({ action: "toggle_collisions", enabled: false });
+
+    expect(
+      parseSceneCommand({
+        message: "make the duck bright red and metallic",
+        sceneContext
+      })
+    ).toEqual({
+      action: "update_object_appearance",
+      target: "duck_01",
+      changes: { baseColor: "#ff0000", metalness: 0.85 }
+    });
+  });
+
+  it("parses numeric physics and background generation commands", () => {
+    expect(
+      parseSceneCommand({
+        message: "set duck friction to 0.2",
+        sceneContext
+      })
+    ).toEqual({
+      action: "update_object_physics",
+      target: "duck_01",
+      changes: { friction: 0.2 }
+    });
+
+    expect(
+      parseSceneCommand({
+        message: "generate a deep starry night background",
+        sceneContext
+      })
+    ).toEqual({
+      action: "generate_background_image",
+      prompt: "deep starry night background"
+    });
+  });
+
+  it("falls back to local parsing when the primary command parser fails", async () => {
+    const parser = new FallbackCommandParser(
+      {
+        async parse() {
+          throw new Error("Gemini unavailable");
+        }
+      },
+      {
+        async parse() {
+          return {
+            operation: { action: "toggle_gravity", enabled: false }
+          };
+        }
+      }
+    );
+
+    await expect(
+      parser.parse({ message: "turn gravity off", sceneContext })
+    ).resolves.toEqual({
+      operation: { action: "toggle_gravity", enabled: false }
+    });
   });
 });

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Send } from 'lucide-react';
 import useStore from '../../store/useStore';
 import {
+  requestBackgroundImage,
   requestFallbackAsset,
   requestGeneratedAsset,
   requestGeneratedAssetModel,
@@ -38,6 +39,8 @@ export default function ChatPanel() {
     mergeSceneObjectEstimate,
     addGlbImportWarning,
     setHighlightedObject,
+    setSceneBackgroundStatus,
+    setSceneBackground,
   } = useStore();
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -63,9 +66,13 @@ export default function ChatPanel() {
     addChatMessage({ id: nextMessageId(), sender: 'ai', text: 'Thinking...', typing: true });
 
     try {
+      const state = useStore.getState();
       const response = await requestSceneCommand({
         message: text,
-        sceneObjects: useStore.getState().sceneObjects,
+        sceneObjects: state.sceneObjects,
+        selectedObjectId: state.selectedObjectId,
+        gravityEnabled: state.gravityEnabled,
+        collisionsEnabled: state.collisionsEnabled,
       });
       await handleOperation(response.operation);
     } catch (error) {
@@ -92,6 +99,11 @@ export default function ChatPanel() {
 
     if (operation.action === 'export_scene') {
       await handleExportOperation();
+      return;
+    }
+
+    if (operation.action === 'generate_background_image') {
+      await handleBackgroundImageOperation(operation);
       return;
     }
 
@@ -300,6 +312,26 @@ export default function ChatPanel() {
     }
   };
 
+  const handleBackgroundImageOperation = async (operation) => {
+    try {
+      setSceneBackgroundStatus('generating');
+      const background = await requestBackgroundImage({ prompt: operation.prompt });
+      setSceneBackground(background);
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: 'Generated a scene background.',
+      });
+    } catch (error) {
+      setSceneBackgroundStatus('error', errorMessage(error));
+      updateLastMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        text: `Background generation failed: ${errorMessage(error)}.`,
+      });
+    }
+  };
+
   return (
     <div className={styles.chatPanel}>
       <div className={styles.chatMessages}>
@@ -363,8 +395,12 @@ function labelForAppliedOperation(operation) {
   switch (operation.action) {
     case 'toggle_gravity':
       return operation.enabled ? 'Gravity is on.' : 'Gravity is off.';
+    case 'toggle_collisions':
+      return operation.enabled ? 'Collisions are on.' : 'Collisions are off.';
     case 'update_object_physics':
       return 'Updated object physics.';
+    case 'update_object_appearance':
+      return 'Updated object appearance.';
     case 'move_object':
       return 'Moved the selected object.';
     case 'rotate_object':

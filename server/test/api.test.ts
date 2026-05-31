@@ -8,6 +8,7 @@ import type {
   GeneratedAsset,
   TextAssetGenerationInput
 } from "../src/providers/AssetGenerator.js";
+import type { BackgroundImageGenerator } from "../src/providers/BackgroundImageGenerator.js";
 import type { CommandParser } from "../src/providers/CommandParser.js";
 
 class FakeAssetGenerator implements AssetGenerator {
@@ -47,6 +48,19 @@ class FakeCommandParser implements CommandParser {
         action: "toggle_gravity" as const,
         enabled: true
       }
+    };
+  }
+}
+
+class FakeBackgroundImageGenerator implements BackgroundImageGenerator {
+  async generate() {
+    return {
+      provider: "gemini" as const,
+      model: "gemini-2.5-flash-image",
+      prompt: "deep starry night",
+      revisedPrompt: "Generated a wide starry-night backdrop.",
+      mimeType: "image/png",
+      imageDataUrl: "data:image/png;base64,abc123"
     };
   }
 }
@@ -132,6 +146,29 @@ describe("backend API", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       operation: { action: "toggle_gravity", enabled: true }
+    });
+  });
+
+  it("generates background images through the configured provider", async () => {
+    app = await createApp({
+      assetGenerator: new FakeAssetGenerator(),
+      backgroundImageGenerator: new FakeBackgroundImageGenerator()
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/background-image",
+      payload: { prompt: "deep starry night" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      provider: "gemini",
+      model: "gemini-2.5-flash-image",
+      prompt: "deep starry night",
+      revisedPrompt: "Generated a wide starry-night backdrop.",
+      mimeType: "image/png",
+      imageDataUrl: "data:image/png;base64,abc123"
     });
   });
 

@@ -108,27 +108,47 @@ test('applies common scene operations to project state', () => {
     sceneObjects: [object()],
     selectedObjectId: 'duck_01',
     gravityEnabled: false,
+    collisionsEnabled: true,
   };
 
-  const moved = applySceneOperationToState(initial, {
+  const moved = reduceSceneState(initial, {
     action: 'move_object',
     target: 'duck_01',
     position: [3, 4, 5],
   });
-  const bouncy = applySceneOperationToState({ ...initial, ...moved }, {
+  const bouncy = reduceSceneState(moved, {
     action: 'update_object_physics',
     target: 'duck_01',
     changes: { restitution: 0.85 },
   });
-  const gravity = applySceneOperationToState({ ...initial, ...moved, ...bouncy }, {
+  const gravity = reduceSceneState(bouncy, {
     action: 'toggle_gravity',
     enabled: true,
   });
+  const collisions = reduceSceneState(gravity, {
+    action: 'toggle_collisions',
+    enabled: false,
+  });
+  const colored = reduceSceneState(collisions, {
+    action: 'update_object_appearance',
+    target: 'duck_01',
+    changes: { baseColor: '#ff0000', metalness: 0.85 },
+  });
 
-  assert.deepEqual(gravity.sceneObjects[0].transform.position, [3, 4, 5]);
-  assert.equal(gravity.sceneObjects[0].physics.restitution, 0.85);
-  assert.equal(gravity.gravityEnabled, true);
+  assert.deepEqual(colored.sceneObjects[0].transform.position, [3, 4, 5]);
+  assert.equal(colored.sceneObjects[0].physics.restitution, 0.85);
+  assert.equal(colored.gravityEnabled, true);
+  assert.equal(colored.collisionsEnabled, false);
+  assert.equal(colored.sceneObjects[0].appearance.baseColor, '#ff0000');
+  assert.equal(colored.sceneObjects[0].appearance.metalness, 0.85);
 });
+
+function reduceSceneState(state, operation) {
+  return {
+    ...state,
+    ...applySceneOperationToState(state, operation),
+  };
+}
 
 test('scene operation export requests use the shared export trigger', () => {
   const state = applySceneOperationToState(

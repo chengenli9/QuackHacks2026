@@ -58,6 +58,13 @@ const resettableProjectState = () => ({
   assetSources: [],
   generatedTasks: [],
   highlightedObjectId: null,
+  sceneBackground: {
+    prompt: null,
+    imageDataUrl: null,
+    status: 'idle',
+    error: null,
+    model: null,
+  },
   demoSceneUrl: '/chaoman.glb',
   sourceImageUrl: null,
   chatMessages: DEFAULT_CHAT_MESSAGES,
@@ -134,8 +141,26 @@ const useStore = create((set, get) => ({
     set((state) => ({ exportRequestedAt: (state.exportRequestedAt ?? 0) + 1 })),
 
   // Hierarchy
-  setSelectedObject: (id) => set({ selectedObjectId: id }),
+  setSelectedObject: (id) => set({ selectedObjectId: id, highlightedObjectId: null }),
   setHighlightedObject: (id) => set({ highlightedObjectId: id }),
+  setSceneBackgroundStatus: (status, error = null) =>
+    set((state) => ({
+      sceneBackground: {
+        ...(state.sceneBackground ?? {}),
+        status,
+        error,
+      },
+    })),
+  setSceneBackground: (background) =>
+    set({
+      sceneBackground: {
+        prompt: background.prompt,
+        imageDataUrl: background.imageDataUrl,
+        status: 'ready',
+        error: null,
+        model: background.model ?? null,
+      },
+    }),
   toggleNode: (id) =>
     set((state) => ({
       expandedNodes: state.expandedNodes.includes(id)
@@ -271,6 +296,13 @@ const useStore = create((set, get) => ({
       assetSources: [],
       selectedObjectId: 'Room_Mesh',
       highlightedObjectId: null,
+      sceneBackground: {
+        prompt: null,
+        imageDataUrl: null,
+        status: 'idle',
+        error: null,
+        model: null,
+      },
     }),
 
   // Project persistence

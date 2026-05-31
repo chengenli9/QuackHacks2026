@@ -9,15 +9,32 @@ export async function requestSceneCommand({
   fetchImpl = globalThis.fetch,
   message,
   sceneObjects,
+  selectedObjectId,
+  gravityEnabled,
+  collisionsEnabled,
 }) {
   return requestJson(fetchImpl, endpoint(apiBaseUrl, '/api/command'), {
     method: 'POST',
     body: {
       message,
       sceneContext: {
-        objects: sceneObjects.map((object) => ({ id: object.id, label: object.label })),
+        objects: sceneObjects.map(commandContextForObject),
+        ...(selectedObjectId ? { selectedObjectId } : {}),
+        ...(typeof gravityEnabled === 'boolean' ? { gravityEnabled } : {}),
+        ...(typeof collisionsEnabled === 'boolean' ? { collisionsEnabled } : {}),
       },
     },
+  });
+}
+
+export async function requestBackgroundImage({
+  apiBaseUrl = configuredApiBaseUrl(),
+  fetchImpl = globalThis.fetch,
+  prompt,
+}) {
+  return requestJson(fetchImpl, endpoint(apiBaseUrl, '/api/background-image'), {
+    method: 'POST',
+    body: { prompt },
   });
 }
 
@@ -83,4 +100,16 @@ async function requestJson(fetchImpl, url, init = {}) {
   }
 
   return body;
+}
+
+function commandContextForObject(object) {
+  return {
+    id: object.id,
+    label: object.label,
+    ...(object.physics?.category ? { category: object.physics.category } : {}),
+    ...(object.physics?.material ? { material: object.physics.material } : {}),
+    ...(object.transform?.position ? { position: object.transform.position } : {}),
+    ...(object.dimensions ? { dimensions: object.dimensions } : {}),
+    ...(typeof object.physics?.static === 'boolean' ? { static: object.physics.static } : {}),
+  };
 }

@@ -33,6 +33,7 @@ const PROJECT_FIELDS = [
   'assetSources',
   'generatedTasks',
   'highlightedObjectId',
+  'sceneBackground',
   'demoSceneUrl',
   'sourceImageUrl',
   'chatMessages',

@@ -26,11 +26,23 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
   const message = request.message.trim();
   const normalized = normalize(message);
 
+  if (normalized.includes("collision")) {
+    return validateOperation({
+      action: "toggle_collisions",
+      enabled: !/\b(off|disable|stop|without)\b/.test(normalized)
+    });
+  }
+
   if (normalized.includes("gravity")) {
     return validateOperation({
       action: "toggle_gravity",
       enabled: !/\b(off|disable|stop)\b/.test(normalized)
     });
+  }
+
+  const background = parseBackgroundCommand(message, normalized);
+  if (background) {
+    return background;
   }
 
   if (/\b(export|download|save)\b/.test(normalized)) {
@@ -52,7 +64,12 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
     return generated;
   }
 
-  const physics = parsePhysicsCommand(normalized, request.sceneContext.objects);
+  const appearance = parseAppearanceCommand(message, normalized, request.sceneContext.objects);
+  if (appearance) {
+    return appearance;
+  }
+
+  const physics = parsePhysicsCommand(message, normalized, request.sceneContext.objects);
   if (physics) {
     return physics;
   }
@@ -71,6 +88,32 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
 
 export const buildCommandResponse = (input: CommandRequest) =>
   commandResponseSchema.parse({ operation: parseSceneCommand(input) });
+
+const parseBackgroundCommand = (
+  message: string,
+  normalized: string
+): SceneOperation | undefined => {
+  if (!/\b(background|backdrop|sky|horizon|environment)\b/.test(normalized)) {
+    return undefined;
+  }
+
+  if (!/\b(generate|create|make|set|change|paint)\b/.test(normalized)) {
+    return undefined;
+  }
+
+  const prompt = message
+    .replace(/^\s*(please\s+)?(generate|create|make|set|change|paint)\s+/i, "")
+    .replace(/\b(?:a|an|the)\b/gi, " ")
+    .replace(/\b(?:scene|canvas|viewport)?\s*(background|backdrop|sky|horizon|environment)\b/gi, " background")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.!?]+$/, "");
+
+  return validateOperation({
+    action: "generate_background_image",
+    prompt: prompt || message.trim()
+  });
+};
 
 const parseGeneratedAssetCommand = (
   message: string,
@@ -155,7 +198,52 @@ const parseRelabelCommand = (
   });
 };
 
+const parseAppearanceCommand = (
+  message: string,
+  normalized: string,
+  objects: SceneObject[]
+): SceneOperation | undefined => {
+  if (!/\b(make|set|turn|change|color|paint)\b/.test(normalized)) {
+    return undefined;
+  }
+
+  const target = findMentionedObject(normalized, objects);
+  if (!target) return undefined;
+
+  const changes: Record<string, string | number> = {};
+  const hex = message.match(/#[0-9a-fA-F]{6}\b/)?.[0];
+  const namedColor = colorFor(normalized);
+  const color = hex ?? namedColor;
+  if (color) {
+    changes.baseColor = color;
+  }
+
+  const roughness = numericProperty(message, "roughness");
+  if (roughness !== undefined) changes.roughness = roughness;
+  if (/\b(matte|flat|rough)\b/.test(normalized)) changes.roughness = changes.roughness ?? 0.9;
+  if (/\b(glossy|shiny|polished|smooth)\b/.test(normalized)) changes.roughness = changes.roughness ?? 0.22;
+
+  const metalness = numericProperty(message, "metalness") ?? numericProperty(message, "metallic");
+  if (metalness !== undefined) changes.metalness = metalness;
+  if (/\b(nonmetal|non metallic|not metallic|plastic)\b/.test(normalized)) {
+    changes.metalness = 0;
+  } else if (/\b(metallic|metal|chrome|steel)\b/.test(normalized)) {
+    changes.metalness = changes.metalness ?? 0.85;
+  }
+
+  if (Object.keys(changes).length === 0) {
+    return undefined;
+  }
+
+  return validateOperation({
+    action: "update_object_appearance",
+    target: target.id,
+    changes
+  });
+};
+
 const parsePhysicsCommand = (
+  message: string,
   normalized: string,
   objects: SceneObject[]
 ): SceneOperation | undefined => {
@@ -167,6 +255,42 @@ const parsePhysicsCommand = (
 
   if (!target) {
     return undefined;
+  }
+
+  const friction = numericProperty(message, "friction");
+  if (friction !== undefined) {
+    return validateOperation({
+      action: "update_object_physics",
+      target: target.id,
+      changes: { friction }
+    });
+  }
+
+  const restitution = numericProperty(message, "restitution") ?? numericProperty(message, "bounce");
+  if (restitution !== undefined) {
+    return validateOperation({
+      action: "update_object_physics",
+      target: target.id,
+      changes: { restitution }
+    });
+  }
+
+  const massKg = numericProperty(message, "mass");
+  if (massKg !== undefined) {
+    return validateOperation({
+      action: "update_object_physics",
+      target: target.id,
+      changes: { massKg }
+    });
+  }
+
+  const collider = colliderFor(normalized);
+  if (collider) {
+    return validateOperation({
+      action: "update_object_physics",
+      target: target.id,
+      changes: { collider }
+    });
   }
 
   if (/\bbouncier|bounce|springier\b/.test(normalized)) {
@@ -334,8 +458,47 @@ const findObjectByPhrase = (
     );
   });
 
-const validateOperation = (operation: SceneOperation): SceneOperation =>
+const validateOperation = (operation: unknown): SceneOperation =>
   sceneOperationSchema.parse(operation);
+
+const numericProperty = (value: string, name: string): number | undefined => {
+  const normalized = value.toLowerCase().replace(/[^\w\s.=]/g, " ").replace(/\s+/g, " ").trim();
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = normalized.match(new RegExp(`\\b${escaped}\\b\\s*(?:to|=|at)?\\s*(\\d+(?:\\.\\d+)?)`));
+  if (!match) return undefined;
+  return Number(match[1]);
+};
+
+const colorFor = (normalized: string): string | undefined => {
+  const colors: Record<string, string> = {
+    red: "#ff0000",
+    orange: "#ff8a00",
+    yellow: "#ffd400",
+    green: "#00a651",
+    blue: "#1f6fff",
+    purple: "#7c3aed",
+    pink: "#ff4fa3",
+    black: "#111111",
+    white: "#f5f5f5",
+    gray: "#808080",
+    grey: "#808080",
+    brown: "#8b5a2b",
+    gold: "#d4af37",
+    silver: "#c0c0c0"
+  };
+
+  return Object.entries(colors).find(([name]) =>
+    new RegExp(`\\b${name}\\b`).test(normalized)
+  )?.[1];
+};
+
+const colliderFor = (normalized: string): "ball" | "cuboid" | "cylinder" | "convex_hull" | undefined => {
+  if (/\b(ball|sphere|round)\b/.test(normalized)) return "ball";
+  if (/\b(box|cube|cuboid)\b/.test(normalized)) return "cuboid";
+  if (/\b(cylinder|tube|barrel)\b/.test(normalized)) return "cylinder";
+  if (/\b(convex|hull|mesh)\b/.test(normalized)) return "convex_hull";
+  return undefined;
+};
 
 const normalize = (value: string): string =>
   value.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();

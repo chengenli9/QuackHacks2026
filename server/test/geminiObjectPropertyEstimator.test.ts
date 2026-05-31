@@ -67,6 +67,8 @@ describe("GeminiObjectPropertyEstimator", () => {
     expect(requestApiKey).toBe("gemini-key");
     expect(requestBody.generationConfig.responseMimeType).toBe("application/json");
     expect(requestBody.generationConfig.responseJsonSchema.properties.appearance).toBeDefined();
+    expect(requestBody.contents[0].parts[0].text).toContain("contextual object title");
+    expect(requestBody.contents[0].parts[0].text).toContain("Do not keep generic labels like geometry_0");
     expect(requestBody.contents[0].parts[1]).toEqual({
       inlineData: { mimeType: "image/png", data: "abc123" }
     });

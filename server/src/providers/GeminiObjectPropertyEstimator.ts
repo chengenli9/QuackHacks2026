@@ -92,7 +92,7 @@ export class GeminiObjectPropertyEstimator implements ObjectPropertyEstimator {
     const parts: Array<unknown> = [
       {
         text:
-          "Estimate game-ready semantic, material, appearance, and physics metadata for this GLB scene object. Return only JSON matching the schema. Favor simplified colliders and practical game physics over exact physical accuracy.\n\n" +
+          "Estimate game-ready semantic, material, appearance, and physics metadata for this separate GLB scene geometry. Produce a concise contextual object title in label based on what the object looks like and how it fits the surrounding scene. Do not keep generic labels like geometry_0, mesh_1, node, or object unless the image truly cannot be identified. Return only JSON matching the schema. Favor simplified colliders and practical game physics over exact physical accuracy.\n\n" +
           JSON.stringify({
             objectId: request.objectId,
             label: request.label,

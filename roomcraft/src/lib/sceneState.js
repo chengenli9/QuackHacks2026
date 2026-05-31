@@ -170,10 +170,20 @@ export function applySceneOperationToState(state, operation) {
         sceneObjects: updateObjectPhysics(state.sceneObjects, operation.target, operation.changes),
         selectedObjectId: operation.target,
       };
+    case 'update_object_appearance':
+      return {
+        sceneObjects: updateObjectAppearance(state.sceneObjects, operation.target, operation.changes),
+        selectedObjectId: operation.target,
+      };
     case 'remove_object': {
       const sceneObjects = state.sceneObjects.filter((object) => object.id !== operation.target);
+      const nextTransforms = { ...(state.sceneObjectTransforms ?? {}) };
+      delete nextTransforms[operation.target];
       return {
         sceneObjects,
+        sceneObjectTransforms: nextTransforms,
+        highlightedObjectId:
+          state.highlightedObjectId === operation.target ? null : state.highlightedObjectId,
         selectedObjectId:
           state.selectedObjectId === operation.target
             ? sceneObjects[0]?.id ?? 'Room_Mesh'
@@ -182,6 +192,8 @@ export function applySceneOperationToState(state, operation) {
     }
     case 'toggle_gravity':
       return { ...state, gravityEnabled: operation.enabled };
+    case 'toggle_collisions':
+      return { ...state, collisionsEnabled: operation.enabled };
     case 'relabel_object':
       return {
         sceneObjects: state.sceneObjects.map((object) =>

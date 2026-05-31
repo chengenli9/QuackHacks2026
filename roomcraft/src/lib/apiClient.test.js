@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   requestFallbackAsset,
+  requestBackgroundImage,
   requestGeneratedAsset,
   requestGeneratedAssetModel,
   requestGeneratedAssetStatus,
@@ -26,17 +27,66 @@ test('posts chat commands with scene context to backend command endpoint', async
     apiBaseUrl: 'http://localhost:8787/',
     fetchImpl,
     message: 'turn gravity on',
-    sceneObjects: [{ id: 'duck_01', label: 'rubber duck' }],
+    sceneObjects: [{
+      id: 'duck_01',
+      label: 'rubber duck',
+      physics: { category: 'toy', material: 'rubber', static: false },
+      transform: { position: [0, 1, 0] },
+      dimensions: [0.4, 0.3, 0.3],
+    }],
+    selectedObjectId: 'duck_01',
+    gravityEnabled: false,
+    collisionsEnabled: true,
   });
 
   assert.equal(requestUrl, 'http://localhost:8787/api/command');
   assert.deepEqual(requestBody, {
     message: 'turn gravity on',
     sceneContext: {
-      objects: [{ id: 'duck_01', label: 'rubber duck' }],
+      objects: [{
+        id: 'duck_01',
+        label: 'rubber duck',
+        category: 'toy',
+        material: 'rubber',
+        position: [0, 1, 0],
+        dimensions: [0.4, 0.3, 0.3],
+        static: false,
+      }],
+      selectedObjectId: 'duck_01',
+      gravityEnabled: false,
+      collisionsEnabled: true,
     },
   });
   assert.deepEqual(response.operation, { action: 'toggle_gravity', enabled: true });
+});
+
+test('requests Gemini background image generation', async () => {
+  let requestUrl;
+  let requestBody;
+  const fetchImpl = async (url, init) => {
+    requestUrl = url;
+    requestBody = JSON.parse(init.body);
+    return {
+      ok: true,
+      json: async () => ({
+        provider: 'gemini',
+        model: 'gemini-2.5-flash-image',
+        prompt: 'deep starry night',
+        mimeType: 'image/png',
+        imageDataUrl: 'data:image/png;base64,abc123',
+      }),
+    };
+  };
+
+  const response = await requestBackgroundImage({
+    apiBaseUrl: 'http://localhost:8787/',
+    fetchImpl,
+    prompt: 'deep starry night',
+  });
+
+  assert.equal(requestUrl, 'http://localhost:8787/api/background-image');
+  assert.deepEqual(requestBody, { prompt: 'deep starry night' });
+  assert.equal(response.imageDataUrl, 'data:image/png;base64,abc123');
 });
 
 test('uses generated asset endpoints for task lifecycle', async () => {
