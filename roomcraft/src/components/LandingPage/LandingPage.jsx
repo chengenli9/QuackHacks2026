@@ -25,8 +25,8 @@ export default function LandingPage() {
         <div className={styles.logo}>
           <Hexagon className={styles.logoIcon} strokeWidth={1.2} />
         </div>
-        <h1 className={styles.title}>ROOMCRAFT</h1>
-        <p className={styles.subtitle}>3D Room Reconstruction</p>
+        <h1 className={styles.title}>PRISM</h1>
+        <p className={styles.subtitle}>Physics-aware Room Import, Segmentation, and Manipulation</p>
       </div>
 
       <div className={styles.actions}>

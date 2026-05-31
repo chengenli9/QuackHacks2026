@@ -298,4 +298,46 @@ describe("extended local command parser", () => {
       operation: { action: "toggle_gravity", enabled: false }
     });
   });
+
+  it("keeps the primary model response instead of overriding it with local keyword parsing", async () => {
+    const parser = new FallbackCommandParser(
+      {
+        async parse() {
+          return {
+            message: "decorative metal tray is selected. I can answer questions about it."
+          };
+        }
+      },
+      {
+        async parse() {
+          return {
+            operations: [
+              { action: "move_object", target: "tray_01", position: [0, 0.1, 0] },
+              { action: "update_object_physics", target: "tray_01", changes: { static: true } }
+            ],
+            message: "I will run 2 editor tools in order."
+          };
+        }
+      }
+    );
+
+    await expect(
+      parser.parse({
+        message: "Lock all the objects and bring them to the floor area",
+        sceneContext: {
+          objects: [
+            {
+              id: "tray_01",
+              label: "decorative metal tray",
+              position: [0, 1, 0],
+              dimensions: [1, 0.2, 1]
+            }
+          ],
+          selectedObjectId: "tray_01"
+        }
+      })
+    ).resolves.toEqual({
+      message: "decorative metal tray is selected. I can answer questions about it."
+    });
+  });
 });

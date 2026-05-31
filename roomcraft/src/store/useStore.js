@@ -44,7 +44,7 @@ const BACKGROUND_GALLERY_LIMIT = 12;
 const resettableProjectState = () => ({
   leftPanelTab: 'import',
   projectId: DEFAULT_PROJECT_ID,
-  projectName: 'RoomCraft Demo',
+  projectName: 'PRISM Demo',
   availableProjects: [],
   projectPickerOpen: false,
   chatSubTab: 'prompt',
@@ -493,7 +493,7 @@ const useStore = create((set, get) => ({
   saveProject: async (storage, options = {}) => {
     try {
       const current = get();
-      const projectName = options.projectName ?? current.projectName ?? 'RoomCraft Demo';
+      const projectName = options.projectName ?? current.projectName ?? 'PRISM Demo';
       const projectId = options.projectId ?? current.projectId ?? projectIdForName(projectName);
       const snapshot = serializeProjectState(current, { projectId, projectName });
       await writeSavedProject(snapshot, storage, projectId);
@@ -517,7 +517,7 @@ const useStore = create((set, get) => ({
     }
   },
   saveProjectAs: async (projectName, storage) => {
-    const name = String(projectName ?? '').trim() || 'RoomCraft Demo';
+    const name = String(projectName ?? '').trim() || 'PRISM Demo';
     return get().saveProject(storage, {
       projectId: projectIdForName(name),
       projectName: name,

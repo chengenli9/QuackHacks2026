@@ -23,10 +23,12 @@ import { registerEstimateObjectRoutes } from "./routes/estimateObject.js";
 import { registerGenerateAssetRoutes } from "./routes/generateAsset.js";
 import { registerGeneratedAssetModelRoutes } from "./routes/generatedAssetModel.js";
 import { registerGeneratedAssetStatusRoutes } from "./routes/generatedAssetStatus.js";
+import { registerImageConversionRoutes } from "./routes/imageConversion.js";
 import { registerProjectRoutes } from "./routes/projects.js";
 import { fallbackAssetKeySchema } from "./schemas.js";
 import { AssetGenerationService } from "./services/assetGenerationService.js";
 import { GeneratedAssetCache } from "./services/generatedAssetCache.js";
+import type { ImageConverter } from "./services/imageConversion.js";
 import { LocalObjectPropertyEstimator } from "./services/localObjectPropertyEstimator.js";
 import { MeshyTaskStore } from "./services/meshyTaskStore.js";
 import { RuleCommandParser } from "./services/commandParser.js";
@@ -43,6 +45,7 @@ export type AppOptions = {
   generatedAssetStorageDir?: string;
   projectStorageDir?: string;
   requestBodyLimitBytes?: number;
+  imageConverter?: ImageConverter;
   fetch?: typeof fetch;
 };
 
@@ -128,6 +131,9 @@ export const createApp = async (options: AppOptions = {}) => {
   );
   await app.register(async (instance) =>
     registerBackgroundImageRoutes(instance, backgroundImageGenerator)
+  );
+  await app.register(async (instance) =>
+    registerImageConversionRoutes(instance, options.imageConverter)
   );
   await app.register(async (instance) =>
     registerEstimateObjectRoutes(instance, objectEstimator)

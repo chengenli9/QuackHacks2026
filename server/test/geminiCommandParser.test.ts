@@ -147,6 +147,94 @@ describe("GeminiCommandParser", () => {
     });
   });
 
+  it("delegates contextual all-object floor and locking decisions to Gemini tools", async () => {
+    let requestBody: any;
+    const parser = new GeminiCommandParser({
+      apiKey: "gemini-key",
+      model: "gemini-3.5-flash",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      fetch: async (_url, init) => {
+        requestBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        operations: [
+                          { action: "move_object", target: "tray_01", position: [2, 0.1, 4] },
+                          {
+                            action: "update_object_physics",
+                            target: "tray_01",
+                            changes: { static: true }
+                          },
+                          { action: "move_object", target: "vase_01", position: [-1, 0.6, 0.5] },
+                          {
+                            action: "update_object_physics",
+                            target: "vase_01",
+                            changes: { static: true }
+                          }
+                        ],
+                        thoughts: [
+                          "Move each object to rest on the floor.",
+                          "Set each object to fixed/static."
+                        ]
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+    });
+
+    await expect(
+      parser.parse({
+        message: "Lock all the objects and bring them to the floor area",
+        sceneContext: {
+          objects: [
+            {
+              id: "tray_01",
+              label: "decorative metal tray",
+              material: "metal",
+              position: [2, 3, 4],
+              dimensions: [2, 0.2, 1],
+              static: false
+            },
+            {
+              id: "vase_01",
+              label: "glass vase",
+              material: "glass",
+              position: [-1, 2, 0.5],
+              dimensions: [0.4, 1.2, 0.4],
+              static: false
+            }
+          ],
+          selectedObjectId: "tray_01"
+        }
+      })
+    ).resolves.toMatchObject({
+      operations: [
+        { action: "move_object", target: "tray_01", position: [2, 0.1, 4] },
+        { action: "update_object_physics", target: "tray_01", changes: { static: true } },
+        { action: "move_object", target: "vase_01", position: [-1, 0.6, 0.5] },
+        { action: "update_object_physics", target: "vase_01", changes: { static: true } }
+      ]
+    });
+
+    const prompt = requestBody.contents[0].parts[0].text;
+    expect(prompt).toContain("Do not rely on local keyword parsing");
+    expect(prompt).toContain("Infer the target objects and tools from the full scene context");
+    expect(prompt).toContain("resting on the floor");
+    expect(prompt).toContain("position.y should normally be half of that object's height");
+    expect(prompt).toContain('"label":"decorative metal tray"');
+  });
+
   it("normalizes Gemini color names into validated appearance operations", async () => {
     const parser = new GeminiCommandParser({
       apiKey: "gemini-key",

@@ -27,6 +27,8 @@ function errorMessage(error) {
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const GENERATED_ASSET_POLL_ATTEMPTS = 200;
+const GENERATED_ASSET_POLL_INTERVAL_MS = 3000;
 const SCRIPTED_PROMPTS = [
   'add a rubber duck on the coffee table',
   'make the duck bouncier',
@@ -473,7 +475,7 @@ export default function ChatPanel() {
 }
 
 async function pollGeneratedAsset(taskId, operation) {
-  for (let attempt = 0; attempt < 90; attempt += 1) {
+  for (let attempt = 0; attempt < GENERATED_ASSET_POLL_ATTEMPTS; attempt += 1) {
     const status = await requestGeneratedAssetStatus({ taskId });
     useStore.getState().upsertGeneratedTask({
       taskId,
@@ -483,7 +485,7 @@ async function pollGeneratedAsset(taskId, operation) {
       ...status,
     });
     if (status.status === 'succeeded' || status.status === 'failed') return status;
-    await wait(3000);
+    await wait(GENERATED_ASSET_POLL_INTERVAL_MS);
   }
 
   return { taskId, status: 'failed', error: 'Timed out waiting for generated asset.' };

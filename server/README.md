@@ -1,6 +1,6 @@
-# QuackHacks Backend
+# PRISM Backend
 
-Fastify/TypeScript backend for RoomCraft. The server owns external side effects, validates API/model data with Zod, talks to Meshy/Gemini/OpenAI providers, caches generated GLBs, serves fallback assets, and stores saved projects on disk.
+Fastify/TypeScript backend for PRISM: Physics-aware Room Import, Segmentation, and Manipulation. The server owns external side effects, validates API/model data with Zod, talks to Meshy/Gemini/OpenAI providers, caches generated GLBs, serves fallback assets, and stores saved projects on disk.
 
 ## Setup
 

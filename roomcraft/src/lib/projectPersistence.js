@@ -51,7 +51,7 @@ export function serializeProjectState(state, options = {}) {
     ? { ...state, ...state.showtimeReturnState }
     : state;
   const projectId = options.projectId ?? serializableState.projectId ?? DEFAULT_PROJECT_ID;
-  const projectName = options.projectName ?? serializableState.projectName ?? 'RoomCraft Demo';
+  const projectName = options.projectName ?? serializableState.projectName ?? 'PRISM Demo';
 
   for (const field of PROJECT_FIELDS) {
     if (field === 'sceneObjects') {
@@ -96,7 +96,7 @@ export function hydrateProjectSnapshot(snapshot) {
     assetSources: cloneJson(project.assetSources ?? []),
     savedProjectUpdatedAt: snapshot.savedAt,
     projectId: project.projectId ?? DEFAULT_PROJECT_ID,
-    projectName: project.projectName ?? 'RoomCraft Demo',
+    projectName: project.projectName ?? 'PRISM Demo',
     restoredProjectNotice: sceneObjects.length
       ? 'Project metadata restored. Reloading saved GLB sources...'
       : 'Project restored.',

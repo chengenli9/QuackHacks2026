@@ -1,4 +1,6 @@
 export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8787';
+const DEFAULT_REQUEST_TIMEOUT_MS = 60000;
+const BACKGROUND_IMAGE_TIMEOUT_MS = 300000;
 
 export function configuredApiBaseUrl() {
   return import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
@@ -32,7 +34,7 @@ export async function requestSceneCommand({
 export async function requestBackgroundImage({
   apiBaseUrl = configuredApiBaseUrl(),
   fetchImpl = globalThis.fetch,
-  timeoutMs,
+  timeoutMs = BACKGROUND_IMAGE_TIMEOUT_MS,
   prompt,
 }) {
   return requestJson(fetchImpl, endpoint(apiBaseUrl, '/api/background-image'), {
@@ -103,7 +105,7 @@ function endpoint(apiBaseUrl, path) {
 }
 
 async function requestJson(fetchImpl, url, init = {}) {
-  const timeoutMs = init.timeoutMs ?? 60000;
+  const timeoutMs = init.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   let response;

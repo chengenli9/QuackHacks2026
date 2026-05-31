@@ -1,12 +1,23 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { AlertTriangle, Box, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Box, ImagePlus, Sparkles, Wand2, X } from 'lucide-react';
 import useStore from '../../store/useStore';
-import { requestFallbackAsset } from '../../lib/apiClient';
+import { requestBackgroundImage, requestFallbackAsset } from '../../lib/apiClient';
+import {
+  buildSceneGenImagePrompt,
+  configuredSceneGenBaseUrl,
+  dataUrlToImageFile,
+  downloadSceneGenGlb,
+  pollSceneGenJob,
+  submitSceneGenJob,
+} from '../../lib/sceneGenClient';
 import { generatedTaskDisplayStatus } from '../../lib/generatedTaskState';
 import { loadGlbIntoScene } from '../../lib/glbImport';
 import { createProjectAssetSource } from '../../lib/projectPersistence';
 import styles from './LeftPanel.module.css';
+
+const SCENEGEN_IDLE = { phase: 'idle', message: '', error: '' };
+const SCENEGEN_PHOTO_EXTENSIONS = /\.(jpe?g|png|webp|heic|heif|tiff?|bmp|avif|jxl)$/i;
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
@@ -77,6 +88,27 @@ export default function ImportPanel() {
     upsertGeneratedTask,
   } = useStore();
   const lastHandledGlbImportRequest = useRef(0);
+
+  const [sceneGenImage, setSceneGenImage] = useState(null);
+  const [sceneGenOptions, setSceneGenOptions] = useState({
+    segmentationMode: 'hybrid',
+    maxInstances: 12,
+    textureSize: 1024,
+  });
+  const [sceneGenState, setSceneGenState] = useState(SCENEGEN_IDLE);
+  const [imagePrompt, setImagePrompt] = useState('');
+  const [imageGenState, setImageGenState] = useState({ phase: 'idle', error: '' });
+  const sceneGenAbortRef = useRef(null);
+
+  const sceneGenPreviewUrl = useMemo(
+    () => (sceneGenImage ? URL.createObjectURL(sceneGenImage) : null),
+    [sceneGenImage],
+  );
+
+  useEffect(() => {
+    if (!sceneGenPreviewUrl) return undefined;
+    return () => URL.revokeObjectURL(sceneGenPreviewUrl);
+  }, [sceneGenPreviewUrl]);
 
   const importFromUrl = useCallback(async ({ url, fileName, sourcePrompt, placement, manifest, assetSource }) => {
     try {
@@ -197,6 +229,92 @@ export default function ImportPanel() {
     void importFromUrl({ url: demoSceneUrl, fileName, assetSource });
   };
 
+  const onSceneGenDrop = useCallback((accepted) => {
+    const image = accepted.find((file) =>
+      file.type.startsWith('image/') || SCENEGEN_PHOTO_EXTENSIONS.test(file.name)
+    ) ?? accepted[0];
+    if (image) {
+      setSceneGenImage(image);
+      setSceneGenState(SCENEGEN_IDLE);
+    }
+  }, []);
+
+  const sceneGenDropzone = useDropzone({
+    onDrop: onSceneGenDrop,
+    accept: {
+      'image/*': ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.tif', '.tiff', '.bmp', '.avif', '.jxl'],
+      'application/octet-stream': ['.heic', '.heif'],
+    },
+    multiple: false,
+    noKeyboard: true,
+  });
+
+  const runSceneGenPipeline = useCallback(async () => {
+    if (!sceneGenImage) return;
+    const controller = new AbortController();
+    sceneGenAbortRef.current = controller;
+
+    try {
+      setSceneGenState({ phase: 'submitting', message: 'Uploading photo to SceneGen...', error: '' });
+      const job = await submitSceneGenJob({
+        image: sceneGenImage,
+        segmentationMode: sceneGenOptions.segmentationMode,
+        maxInstances: sceneGenOptions.maxInstances,
+        textureSize: sceneGenOptions.textureSize,
+      });
+
+      setSceneGenState({ phase: 'processing', message: `Job ${job.jobId} queued...`, error: '' });
+      await pollSceneGenJob({
+        jobId: job.jobId,
+        signal: controller.signal,
+        onUpdate: (payload) => {
+          const stage = payload?.stage ?? payload?.status ?? 'processing';
+          const progress = Number.isFinite(payload?.progress) ? ` (${Math.round(payload.progress)}%)` : '';
+          setSceneGenState({ phase: 'processing', message: `${stage}${progress}`, error: '' });
+        },
+      });
+
+      setSceneGenState({ phase: 'downloading', message: 'Downloading generated GLB...', error: '' });
+      const glbFile = await downloadSceneGenGlb({ jobId: job.jobId });
+
+      setSceneGenState({ phase: 'importing', message: 'Loading scene into viewport...', error: '' });
+      await importFile(glbFile, null);
+
+      setSceneGenState({ phase: 'done', message: `Imported scene from job ${job.jobId}.`, error: '' });
+    } catch (error) {
+      setSceneGenState({ phase: 'error', message: '', error: errorMessage(error) });
+    } finally {
+      sceneGenAbortRef.current = null;
+    }
+  }, [importFile, sceneGenImage, sceneGenOptions]);
+
+  const cancelSceneGen = useCallback(() => {
+    sceneGenAbortRef.current?.abort();
+    setSceneGenState(SCENEGEN_IDLE);
+  }, []);
+
+  const generateSceneImage = useCallback(async () => {
+    if (!imagePrompt.trim()) return;
+    setImageGenState({ phase: 'generating', error: '' });
+    try {
+      const result = await requestBackgroundImage({
+        prompt: buildSceneGenImagePrompt(imagePrompt),
+      });
+      if (!result?.imageDataUrl) throw new Error('Nano Banana returned no image.');
+      const fileName = `nano-banana-${Date.now().toString(36)}`;
+      const image = dataUrlToImageFile(result.imageDataUrl, fileName);
+      setSceneGenImage(image);
+      setSceneGenState(SCENEGEN_IDLE);
+      setImageGenState({ phase: 'done', error: '' });
+    } catch (error) {
+      setImageGenState({ phase: 'error', error: errorMessage(error) });
+    }
+  }, [imagePrompt]);
+
+  const imageGenBusy = imageGenState.phase === 'generating';
+
+  const sceneGenBusy = ['submitting', 'processing', 'downloading', 'importing'].includes(sceneGenState.phase);
+
   return (
     <div className={styles.importPanel}>
       <span className={styles.sectionLabel}>GLB Scene</span>
@@ -215,6 +333,139 @@ export default function ImportPanel() {
       <button className={styles.processBtn} onClick={handleDemoScene}>
         Load Demo Scene
       </button>
+
+      <div className={styles.panelDivider} />
+      <span className={styles.sectionLabel}>Photo → Scene (SceneGen)</span>
+
+      <div
+        {...sceneGenDropzone.getRootProps()}
+        className={`${styles.dropzone} ${sceneGenDropzone.isDragActive ? styles.dragOver : ''} ${sceneGenPreviewUrl ? styles.dropzoneHasPreview : ''}`}
+      >
+        <input {...sceneGenDropzone.getInputProps()} />
+        {sceneGenPreviewUrl ? (
+          <>
+            <button
+              type="button"
+              className={styles.clearImportBtn}
+              title="Remove image"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSceneGenImage(null);
+                setSceneGenState(SCENEGEN_IDLE);
+              }}
+            >
+              <X size={12} />
+            </button>
+            <img src={sceneGenPreviewUrl} alt={sceneGenImage?.name ?? 'Scene source'} className={styles.imagePreview} />
+            <span className={styles.dropzoneText}>{sceneGenImage?.name ?? 'Scene source'}</span>
+          </>
+        ) : (
+          <>
+            <ImagePlus size={20} className={styles.dropzoneIcon} />
+            <span className={styles.dropzoneText}>
+              Drop a room photo<br />HEIC converts to JPG automatically
+            </span>
+          </>
+        )}
+      </div>
+
+      <span className={styles.sectionLabel}>Or generate one with Nano Banana</span>
+      <textarea
+        className={styles.promptInput}
+        rows={2}
+        placeholder="e.g. a cozy living room with a sofa, coffee table, floor lamp, and bookshelf"
+        value={imagePrompt}
+        disabled={imageGenBusy || sceneGenBusy}
+        onChange={(event) => setImagePrompt(event.target.value)}
+      />
+      <button
+        className={styles.processBtn}
+        onClick={() => void generateSceneImage()}
+        disabled={!imagePrompt.trim() || imageGenBusy || sceneGenBusy}
+      >
+        <Wand2 size={14} className={styles.btnIcon} />
+        {imageGenBusy ? 'Generating image...' : 'Generate Scene Image'}
+      </button>
+
+      {imageGenState.error && (
+        <div className={`${styles.importNotice} ${styles.errorNotice}`}>
+          <AlertTriangle size={14} />
+          <span>{imageGenState.error}</span>
+        </div>
+      )}
+
+      <div className={styles.settingsRow}>
+        <span className={styles.settingsLabel}>Segmentation</span>
+        <select
+          className={styles.select}
+          value={sceneGenOptions.segmentationMode}
+          disabled={sceneGenBusy}
+          onChange={(event) =>
+            setSceneGenOptions((prev) => ({ ...prev, segmentationMode: event.target.value }))
+          }
+        >
+          <option value="hybrid">hybrid</option>
+          <option value="sam2_auto">sam2_auto</option>
+        </select>
+      </div>
+
+      <div className={styles.settingsRow}>
+        <span className={styles.settingsLabel}>Max instances</span>
+        <select
+          className={styles.select}
+          value={sceneGenOptions.maxInstances}
+          disabled={sceneGenBusy}
+          onChange={(event) =>
+            setSceneGenOptions((prev) => ({ ...prev, maxInstances: Number(event.target.value) }))
+          }
+        >
+          {[4, 8, 12, 16, 24].map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.settingsRow}>
+        <span className={styles.settingsLabel}>Texture size</span>
+        <select
+          className={styles.select}
+          value={sceneGenOptions.textureSize}
+          disabled={sceneGenBusy}
+          onChange={(event) =>
+            setSceneGenOptions((prev) => ({ ...prev, textureSize: Number(event.target.value) }))
+          }
+        >
+          {[512, 1024, 2048, 4096].map((value) => (
+            <option key={value} value={value}>{value}</option>
+          ))}
+        </select>
+      </div>
+
+      {sceneGenBusy ? (
+        <button className={styles.processBtn} onClick={cancelSceneGen}>
+          Cancel
+        </button>
+      ) : (
+        <button
+          className={styles.processBtn}
+          onClick={() => void runSceneGenPipeline()}
+          disabled={!sceneGenImage}
+        >
+          Run SceneGen Pipeline
+        </button>
+      )}
+
+      {(sceneGenState.message || sceneGenState.error) && (
+        <div className={`${styles.importNotice} ${sceneGenState.error ? styles.errorNotice : ''}`}>
+          {sceneGenState.error ? <AlertTriangle size={14} /> : <Sparkles size={14} />}
+          <span>{sceneGenState.error || sceneGenState.message}</span>
+        </div>
+      )}
+
+      <div className={styles.importMetaRow}>
+        <span>Endpoint</span>
+        <span title={configuredSceneGenBaseUrl()}>{new URL(configuredSceneGenBaseUrl()).host}</span>
+      </div>
 
       {glbImportStatus === 'loading' && (
         <div className={styles.importNotice}>

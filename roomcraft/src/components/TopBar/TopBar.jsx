@@ -19,7 +19,7 @@ const MENUS = {
   ],
   Edit: ['Undo', 'Redo', '---', 'Select All', 'Deselect All', '---', 'Preferences'],
   View: ['Toggle Left Panel', 'Toggle Right Panel', '---', 'Fullscreen', '---', 'Reset Layout'],
-  Help: ['Documentation', 'Keyboard Shortcuts', '---', 'About RoomCraft'],
+  Help: ['Documentation', 'Keyboard Shortcuts', '---', 'About PRISM'],
 };
 
 function itemLabel(item) {
@@ -99,7 +99,7 @@ export default function TopBar() {
         await saveProject();
       }
       if (action === 'saveProjectAs') {
-        const name = window.prompt('Project name', projectName || 'RoomCraft Demo');
+        const name = window.prompt('Project name', projectName || 'PRISM Demo');
         if (name?.trim()) await saveProjectAs(name.trim());
       }
       if (action === 'openProject') {
@@ -122,7 +122,7 @@ export default function TopBar() {
     <header className={styles.topbar}>
       <div className={styles.logo}>
         <Hexagon className={styles.logoIcon} strokeWidth={1.5} />
-        <span className={styles.logoText}>ROOMCRAFT</span>
+        <span className={styles.logoText}>PRISM</span>
       </div>
 
       <nav className={styles.menuBar}>

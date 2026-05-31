@@ -1,6 +1,6 @@
-# RoomCraft Frontend
+# PRISM Frontend
 
-RoomCraft is the browser editor for the QuackHacks Scene-to-3D Physics Sandbox. It imports GLB scenes, registers editable objects, renders the scene with React Three Fiber, simulates physics with Rapier, and applies validated chat/tool operations to the local Zustand project store.
+PRISM: Physics-aware Room Import, Segmentation, and Manipulation is the browser editor for the Scene-to-3D Physics Sandbox. It imports GLB scenes, registers editable objects, renders the scene with React Three Fiber, simulates physics with Rapier, and applies validated chat/tool operations to the local Zustand project store.
 
 ## Stack
 

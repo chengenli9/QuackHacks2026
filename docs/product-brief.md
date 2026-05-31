@@ -4,7 +4,7 @@ Updated: 2026-05-31
 
 ## Build Goal
 
-RoomCraft is a GLB-import-first 3D physics editor where users load a pre-generated scene, interact with object-level physics/materials, edit the scene through chat, generate new 3D assets with Meshy, generate backgrounds with Gemini, save projects, and export the updated scene.
+PRISM: Physics-aware Room Import, Segmentation, and Manipulation is a GLB-import-first 3D physics editor where users load a pre-generated scene, interact with object-level physics/materials, edit the scene through chat, generate new 3D assets with Meshy, generate backgrounds with Gemini, save projects, and export the updated scene.
 
 SceneGen remains outside the critical runtime path. It can be used manually or through a later preprocessing pipeline, but the live demo does not depend on runtime scene reconstruction.
 

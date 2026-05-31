@@ -34,7 +34,7 @@ export async function exportSceneArtifacts({
 
 export async function exportSceneGlb(sceneObjects) {
   const root = new Group();
-  root.name = 'RoomCraft_Export';
+  root.name = 'PRISM_Export';
 
   for (const object of sceneObjects) {
     if (!object.object3d) continue;

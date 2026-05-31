@@ -1,6 +1,6 @@
-# QuackHacks2026
+# PRISM
 
-QuackHacks2026 is a browser-based Scene-to-3D Physics Sandbox. The app imports completed GLB scenes, registers object-level editor handles, lets users inspect and edit physics/material metadata, runs Rapier physics, and uses chat-driven tools for scene changes, asset generation, backgrounds, project saves, and export.
+PRISM: Physics-aware Room Import, Segmentation, and Manipulation is a browser-based Scene-to-3D Physics Sandbox. The app imports completed GLB scenes, registers object-level editor handles, lets users inspect and edit physics/material metadata, runs Rapier physics, and uses chat-driven tools for scene changes, asset generation, backgrounds, project saves, and export.
 
 SceneGen remains an external preprocessing step. The runtime app focuses on completed GLBs, optional manifests, editor-authoritative transforms, validated AI/tool operations, Meshy-generated GLB insertion, Gemini-backed semantic/background workflows, local fallbacks, and project persistence.
 

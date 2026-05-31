@@ -169,8 +169,8 @@ export const commandRequestSchema = z.object({
 export const commandResponseSchema = z
   .object({
     operation: sceneOperationSchema.optional(),
-    operations: z.array(sceneOperationSchema).min(1).max(8).optional(),
-    thoughts: z.array(z.string().trim().min(1).max(300)).max(8).optional(),
+    operations: z.array(sceneOperationSchema).min(1).max(32).optional(),
+    thoughts: z.array(z.string().trim().min(1).max(300)).max(32).optional(),
     message: z.string().trim().min(1).max(1000).optional()
   })
   .refine((value) => value.operation || value.operations?.length || value.message, {

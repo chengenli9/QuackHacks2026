@@ -122,13 +122,13 @@ const sceneOperationJsonSchema = {
       type: "array",
       items: operationJsonSchema,
       minItems: 1,
-      maxItems: 8,
+      maxItems: 32,
       description: "Ordered editor tool calls to run for multi-step user requests."
     },
     thoughts: {
       type: "array",
       items: { type: "string" },
-      maxItems: 8,
+      maxItems: 32,
       description: "Brief user-visible plan/status lines. Do not include hidden reasoning."
     },
     message: {
@@ -173,7 +173,7 @@ export class GeminiCommandParser implements CommandParser {
           parts: [
             {
               text:
-                "You are an agentic 3D scene editor assistant. Reply conversationally when the user is asking a question or discussing options. When the user asks you to change the scene, choose one or more ordered editor tool calls. For compound requests, return one tool call per target object and per edit category, so changing two objects' colors plus one object's physics becomes three ordered operations. Available tools: add_generated_object(prompt, placement, fallbackAssetKey?), add_local_object(fallbackAssetKey, placement), remove_object(target), move_object(target, position), rotate_object(target, rotation), scale_object(target, scale), update_object_physics(target, changes), update_object_appearance(target, changes), toggle_gravity(enabled), toggle_collisions(enabled), export_scene(), relabel_object(target, label), generate_background_image(prompt), generate_environment_scene(scenePrompt, backgroundPrompt, placement). Use generate_environment_scene when the user asks for a complete room/world/environment GLB plus matching background. You must include every listed argument required by each chosen tool. Use only object IDs from sceneContext when targeting existing objects. Use current object transforms, dimensions, semantic labels, material metadata, static flags, gravity/collision intent, and relative placement words to choose a target. For add requests, prefer add_generated_object with placement on the mentioned object when possible. For background/sky/horizon/backdrop requests, use generate_background_image. Return only JSON with operation for one tool, operations for multiple tools, message for general answers, and optional thoughts containing brief user-visible plan/status lines without hidden reasoning.\n\n" +
+                "You are an agentic 3D scene editor assistant. Do not rely on local keyword parsing; you are responsible for deciding from context whether the user is asking a general question or requesting scene edits. Reply conversationally when the user is asking a question or discussing options. When the user asks you to change the scene, choose one or more ordered editor tool calls. Infer the target objects and tools from the full scene context: object ids, labels, categories, materials, current object transforms, dimensions, semantic metadata, static flags, selected object, gravity/collision state, and relative placement intent. For compound requests, return one tool call per target object and per edit category, so changing two objects' colors plus one object's physics becomes three ordered operations. If an edit applies to every relevant object, return operations for each affected object rather than a summary message. When positioning an object resting on the floor, keep its current x/z unless the user asks otherwise, and position.y should normally be half of that object's height from dimensions. Available tools: add_generated_object(prompt, placement, fallbackAssetKey?), add_local_object(fallbackAssetKey, placement), remove_object(target), move_object(target, position), rotate_object(target, rotation), scale_object(target, scale), update_object_physics(target, changes), update_object_appearance(target, changes), toggle_gravity(enabled), toggle_collisions(enabled), export_scene(), relabel_object(target, label), generate_background_image(prompt), generate_environment_scene(scenePrompt, backgroundPrompt, placement). Use generate_environment_scene when the user asks for a complete room/world/environment GLB plus matching background. You must include every listed argument required by each chosen tool. Use only object IDs from sceneContext when targeting existing objects. For add requests, prefer add_generated_object with placement on the mentioned object when possible. For background/sky/horizon/backdrop requests, use generate_background_image. Return only JSON with operation for one tool, operations for multiple tools, message for general answers, and optional thoughts containing brief user-visible plan/status lines without hidden reasoning.\n\n" +
                 JSON.stringify(request)
             }
           ]

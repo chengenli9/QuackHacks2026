@@ -145,7 +145,7 @@ export class MeshyProvider implements AssetGenerator {
         previewTaskId: taskId,
         refineTaskId,
         textured: true,
-        pbr: true
+        pbr: false
       }
     });
   }
@@ -237,8 +237,8 @@ export class MeshyProvider implements AssetGenerator {
       ai_model: "latest",
       preview_task_id: previewTaskId,
       texture_prompt: prompt,
-      enable_pbr: true,
-      hd_texture: true,
+      enable_pbr: false,
+      hd_texture: false,
       remove_lighting: true,
       target_formats: ["glb"],
       auto_size: true,

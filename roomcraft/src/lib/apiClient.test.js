@@ -89,6 +89,40 @@ test('requests Gemini background image generation', async () => {
   assert.equal(response.imageDataUrl, 'data:image/png;base64,abc123');
 });
 
+test('background image generation uses a longer default timeout', async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  let timeoutDelay;
+
+  globalThis.setTimeout = (callback, delay) => {
+    timeoutDelay = delay;
+    return { callback };
+  };
+  globalThis.clearTimeout = () => {};
+
+  try {
+    await requestBackgroundImage({
+      apiBaseUrl: 'http://localhost:8787',
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({
+          provider: 'gemini',
+          model: 'gemini-2.5-flash-image',
+          prompt: 'deep starry night',
+          mimeType: 'image/png',
+          imageDataUrl: 'data:image/png;base64,abc123',
+        }),
+      }),
+      prompt: 'deep starry night',
+    });
+  } finally {
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  }
+
+  assert.equal(timeoutDelay, 300000);
+});
+
 test('uses generated asset endpoints for task lifecycle', async () => {
   const requests = [];
   const fetchImpl = async (url, init = {}) => {

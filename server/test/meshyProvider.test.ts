@@ -45,7 +45,7 @@ describe("MeshyProvider", () => {
     });
   });
 
-  it("starts a textured refine task after preview and exposes refined GLB URLs", async () => {
+  it("starts a low-definition textured refine task after preview and exposes refined GLB URLs", async () => {
     const fetch = vi.fn(async (url, init) => {
       if (String(url).endsWith("/openapi/v2/text-to-3d") && init?.method === "POST") {
         const body = JSON.parse(String(init.body));
@@ -100,8 +100,8 @@ describe("MeshyProvider", () => {
       ai_model: "latest",
       preview_task_id: "preview_task_1",
       texture_prompt: "rubber duck",
-      enable_pbr: true,
-      hd_texture: true,
+      enable_pbr: false,
+      hd_texture: false,
       remove_lighting: true,
       target_formats: ["glb"],
       auto_size: true,
@@ -127,7 +127,7 @@ describe("MeshyProvider", () => {
         previewTaskId: "preview_task_1",
         refineTaskId: "refine_task_1",
         textured: true,
-        pbr: true
+        pbr: false
       }
     });
   });

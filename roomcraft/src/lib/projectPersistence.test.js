@@ -79,7 +79,7 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.version, PROJECT_SAVE_VERSION);
   assert.equal(snapshot.project.currentView, 'editor');
   assert.equal(snapshot.project.projectId, 'roomcraft-demo');
-  assert.equal(snapshot.project.projectName, 'RoomCraft Demo');
+  assert.equal(snapshot.project.projectName, 'PRISM Demo');
   assert.equal(snapshot.project.gravityEnabled, true);
   assert.equal(snapshot.project.collisionsEnabled, false);
   assert.equal(snapshot.project.objectLabelsEnabled, true);
@@ -398,14 +398,14 @@ test('primary project storage reads the newest snapshot when the remote copy is 
   const staleRemoteSnapshot = serializeProjectState({
     currentView: 'editor',
     projectId: 'roomcraft-demo',
-    projectName: 'RoomCraft Demo',
+    projectName: 'PRISM Demo',
     sceneObjects: [object({ id: 'old_duck', label: 'old duck' })],
   });
   staleRemoteSnapshot.savedAt = '2026-05-30T22:00:00.000Z';
   const newerMirrorSnapshot = serializeProjectState({
     currentView: 'editor',
     projectId: 'roomcraft-demo',
-    projectName: 'RoomCraft Demo',
+    projectName: 'PRISM Demo',
     sceneObjects: [object({ id: 'new_duck', label: 'new duck' })],
   });
   newerMirrorSnapshot.savedAt = '2026-05-30T22:05:00.000Z';
