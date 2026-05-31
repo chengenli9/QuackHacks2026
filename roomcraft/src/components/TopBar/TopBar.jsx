@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Hexagon, RotateCcw } from 'lucide-react';
+import { Camera, Hexagon, RotateCcw } from 'lucide-react';
 import useStore from '../../store/useStore';
 import { openSavedProjectFromStorage } from '../../lib/projectSession';
 import { exportSceneArtifacts } from '../../lib/sceneExport';
@@ -69,6 +69,8 @@ function MenuDropdown({ label, items, open, onToggle, onAction }) {
 
 export default function TopBar() {
   const [openMenu, setOpenMenu] = useState(null);
+  const pictureMode = useStore((state) => state.pictureMode);
+  const togglePictureMode = useStore((state) => state.togglePictureMode);
   const requestGlbImport = useStore((state) => state.requestGlbImport);
   const resetProject = useStore((state) => state.resetProject);
   const saveProject = useStore((state) => state.saveProject);
@@ -115,6 +117,15 @@ export default function TopBar() {
           />
         ))}
       </nav>
+
+      <button
+        className={`${styles.resetBtn} ${pictureMode ? styles.active : ''}`}
+        onClick={togglePictureMode}
+        title={pictureMode ? 'Exit picture mode' : 'Picture mode — hide UI'}
+      >
+        <Camera size={13} />
+        Picture
+      </button>
 
       <button className={styles.resetBtn} onClick={resetProject} title="Reset scene">
         <RotateCcw size={13} />

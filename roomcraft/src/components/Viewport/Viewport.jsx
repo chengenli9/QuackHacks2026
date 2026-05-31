@@ -33,6 +33,7 @@ const TOOLS = [
 ];
 
 export default function Viewport() {
+  const pictureMode = useStore((s) => s.pictureMode);
   const {
     activeTool,
     setActiveTool,
@@ -120,6 +121,7 @@ export default function Viewport() {
       <ThreeScene onCameraUpdate={handleCameraUpdate} cameraTarget={cameraTarget} />
 
       {/* Viewport Top Toolbar */}
+      {!pictureMode && (
       <div className={styles.viewportToolbar}>
         <div style={{ position: 'relative' }}>
           <button
@@ -220,8 +222,10 @@ export default function Viewport() {
           <Sparkles size={12} /> Showtime
         </button>
       </div>
+      )}
 
       {/* Transform Toolbar */}
+      {!pictureMode && (
       <div className={styles.transformToolbar}>
         {TOOLS.map(({ id, icon: Icon, label }) => (
           <button
@@ -234,8 +238,10 @@ export default function Viewport() {
           </button>
         ))}
       </div>
+      )}
 
       {/* Camera Overlay */}
+      {!pictureMode && (
       <div className={styles.cameraOverlay}>
         <span className={styles.camLabel}>CAM</span>
         {[['x'],['y'],['z']].map(([axis]) => (
@@ -252,14 +258,15 @@ export default function Viewport() {
           </span>
         ))}
       </div>
+      )}
 
-      {sourceImageUrl && (
+      {!pictureMode && sourceImageUrl && (
         <div className={styles.sourcePreview}>
           <img src={sourceImageUrl} alt="Source scene" />
         </div>
       )}
 
-      {backgroundGallery?.length > 0 && (
+      {!pictureMode && backgroundGallery?.length > 0 && (
         <div className={styles.backgroundGallery} aria-label="Background gallery">
           {backgroundGallery.map((background) => (
             <button
@@ -276,7 +283,7 @@ export default function Viewport() {
         </div>
       )}
 
-      {physicsXrayEnabled && (
+      {!pictureMode && physicsXrayEnabled && (
         <div className={styles.physicsXrayLegend} aria-label="Physics x-ray legend">
           <strong>Physics X-Ray</strong>
           {PHYSICS_XRAY_LEGEND.map((entry) => (
@@ -288,7 +295,7 @@ export default function Viewport() {
         </div>
       )}
 
-      {showtimeEnabled && activeShowtimeStep && (
+      {!pictureMode && showtimeEnabled && activeShowtimeStep && (
         <ShowtimeOverlay
           step={activeShowtimeStep}
           index={activeShowtimeIndex}

@@ -476,6 +476,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const physicsXrayEnabled = useStore((state) => state.physicsXrayEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
+  const pictureMode = useStore((state) => state.pictureMode);
   const showtimeEnabled = useStore((state) => state.showtimeEnabled);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
   const setHighlightedObject = useStore((state) => state.setHighlightedObject);
@@ -554,6 +555,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
         maxPolarAngle={Math.PI / 1.8}
       />
 
+      {!pictureMode && (
       <GizmoHelper alignment="top-right" margin={[65, 100]}>
         <GizmoViewport
           axisColors={['#e8524a', '#6abf69', '#4d9de0']}
@@ -561,6 +563,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
           hideNegativeAxes={false}
         />
       </GizmoHelper>
+      )}
 
       <CameraTracker onUpdate={onCameraUpdate} />
       <CameraPositioner cameraTarget={cameraTarget} perspective={perspective} />
