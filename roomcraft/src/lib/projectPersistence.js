@@ -85,12 +85,19 @@ export function hydrateProjectSnapshot(snapshot) {
     physicsXrayEnabled: project.physicsXrayEnabled ?? false,
     backgroundGallery: cloneJson(project.backgroundGallery ?? []),
     sceneObjects,
+    selectedObjectId: selectableProjectObjectId(project.selectedObjectId, sceneObjects),
     assetSources: cloneJson(project.assetSources ?? []),
     savedProjectUpdatedAt: snapshot.savedAt,
     restoredProjectNotice: sceneObjects.length
       ? 'Project metadata restored. Reloading saved GLB sources...'
       : 'Project restored.',
   };
+}
+
+function selectableProjectObjectId(objectId, sceneObjects) {
+  return sceneObjects.some((object) => object.id === objectId)
+    ? objectId
+    : sceneObjects[0]?.id ?? 'Room_Mesh';
 }
 
 export async function writeSavedProject(snapshot, storage = browserProjectStorage()) {

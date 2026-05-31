@@ -158,6 +158,19 @@ test('hydrateProjectSnapshot restores saved object metadata as metadata-only unt
   assert.deepEqual(state.sceneObjectTransforms.duck_01.position, [1, 2, 3]);
 });
 
+test('hydrateProjectSnapshot falls back from stale selected object ids', () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    selectedObjectId: 'missing_object',
+    sceneObjects: [object({ id: 'duck_01' })],
+    assetSources: [],
+  });
+
+  const state = hydrateProjectSnapshot(snapshot);
+
+  assert.equal(state.selectedObjectId, 'duck_01');
+});
+
 test('hydrateProjectSnapshot defaults newly added viewport fields for older saved projects', () => {
   const snapshot = serializeProjectState({
     currentView: 'editor',

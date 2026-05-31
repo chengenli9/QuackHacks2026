@@ -1,3 +1,4 @@
+// Keep merged demo imports visible even when the GLB loader can only expose "Imported GLB".
 const GENERIC_LABELS = new Set(['room_mesh', 'scene']);
 
 export const PHYSICS_XRAY_LEGEND = Object.freeze([
