@@ -31,6 +31,7 @@
   top: var(--space-sm);
   left: var(--space-sm);
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   z-index: 10;
   background: rgba(17, 17, 17, 0.85);
@@ -38,6 +39,7 @@
   border-radius: 4px;
   padding: 2px;
   backdrop-filter: blur(4px);
+  max-width: calc(100% - 170px);
 }
 
 .toolbarBtn {
@@ -215,4 +217,160 @@
   height: 100%;
   display: block;
   object-fit: cover;
+}
+
+.showtimeOverlay {
+  position: absolute;
+  right: var(--space-md);
+  top: 58px;
+  width: min(360px, calc(100% - 32px));
+  z-index: 12;
+  padding: var(--space-md);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 6px;
+  background: rgba(18, 18, 18, 0.92);
+  color: var(--text-primary);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.showtimeHeader,
+.showtimeKicker,
+.showtimeActions {
+  display: flex;
+  align-items: center;
+}
+
+.showtimeHeader {
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.showtimeKicker {
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.showtimeCount {
+  color: var(--text-muted);
+}
+
+.showtimeIconBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+
+.showtimeIconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.showtimeProgress {
+  height: 3px;
+  margin-bottom: var(--space-md);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.showtimeProgress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #f7d154, #2dd4bf);
+  transition: width 160ms ease;
+}
+
+.showtimeOverlay h2 {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.showtimeOverlay p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.showtimeFocus {
+  margin-top: var(--space-sm);
+  display: inline-flex;
+  max-width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.06);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.showtimeFacts {
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.showtimeFacts li {
+  padding-left: 10px;
+  border-left: 2px solid rgba(45, 212, 191, 0.75);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.showtimeActions {
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: var(--space-md);
+}
+
+.showtimeActions button {
+  min-width: 72px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.07);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-xs);
+}
+
+.showtimeActions button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (max-width: 760px) {
+  .viewportToolbar {
+    max-width: calc(100% - 16px);
+  }
+
+  .showtimeOverlay {
+    left: var(--space-sm);
+    right: var(--space-sm);
+    top: auto;
+    bottom: var(--space-sm);
+    width: auto;
+  }
 }
