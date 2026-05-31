@@ -80,6 +80,7 @@ test('serializeProjectState saves editor state without runtime Three.js objects'
   assert.equal(snapshot.project.collisionsEnabled, false);
   assert.equal(snapshot.project.viewMode, 'wireframe');
   assert.equal(snapshot.project.perspective, 'Top');
+  assert.equal(snapshot.project.highlightedObjectId, undefined);
   assert.deepEqual(snapshot.project.assetSources[0], {
     id: 'asset_duck',
     type: 'data-url',

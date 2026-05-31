@@ -297,8 +297,8 @@ function ShowtimeOverlay({ step, index, count, onPrevious, onNext, onStop }) {
 
       {facts.length > 0 && (
         <ul className={styles.showtimeFacts}>
-          {facts.map((fact) => (
-            <li key={fact}>{fact}</li>
+          {facts.map((fact, index) => (
+            <li key={`${index}-${fact}`}>{fact}</li>
           ))}
         </ul>
       )}

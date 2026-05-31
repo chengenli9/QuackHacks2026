@@ -379,11 +379,13 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
+  const showtimeEnabled = useStore((state) => state.showtimeEnabled);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
   const setHighlightedObject = useStore((state) => state.setHighlightedObject);
   const renderableSceneObjects = sceneObjects.filter((object) => object.object3d);
 
   useEffect(() => {
+    if (showtimeEnabled) return undefined;
     if (!highlightedObjectId) return undefined;
     const timeout = setTimeout(() => {
       if (useStore.getState().highlightedObjectId === highlightedObjectId) {
@@ -391,7 +393,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
       }
     }, 2500);
     return () => clearTimeout(timeout);
-  }, [highlightedObjectId, setHighlightedObject]);
+  }, [highlightedObjectId, setHighlightedObject, showtimeEnabled]);
 
   return (
     <Canvas
