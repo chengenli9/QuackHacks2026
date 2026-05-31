@@ -151,11 +151,15 @@ export class MeshyProvider implements AssetGenerator {
   }
 
   private promptForMeshy(input: TextAssetGenerationInput): string {
+    const prompt = input.assetType === "environment_scene"
+      ? `${input.prompt}, complete 3D environment scene, cohesive floor and room-scale props`
+      : input.prompt;
+
     if (!input.style || input.style === "lowpoly") {
-      return input.prompt;
+      return prompt;
     }
 
-    return `${input.prompt}, ${input.style} style`;
+    return `${prompt}, ${input.style} style`;
   }
 
   private previewRequestBody(input: TextAssetGenerationInput) {
@@ -179,7 +183,7 @@ export class MeshyProvider implements AssetGenerator {
       case "CANCELED":
         return "failed";
       default:
-        return "failed";
+        return "running";
     }
   }
 }

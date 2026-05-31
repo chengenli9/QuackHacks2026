@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { CuboidCollider, Physics, RigidBody } from '@react-three/rapier';
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   GizmoHelper,
   GizmoViewport,
@@ -10,7 +10,7 @@ import {
   OrbitControls,
   TransformControls,
 } from '@react-three/drei';
-import { Euler, PCFShadowMap, Quaternion, TextureLoader, Vector3 } from 'three';
+import { Euler, PCFShadowMap, Quaternion, Vector3 } from 'three';
 import useStore from '../../store/useStore';
 import {
   editorGravityScale,
@@ -37,8 +37,18 @@ const CAMERA_PRESETS = {
 };
 
 function CameraTracker({ onUpdate }) {
+  const lastUpdateRef = useRef({ time: 0, position: new Vector3(Number.POSITIVE_INFINITY, 0, 0) });
+
   useFrame(({ camera }) => {
-    onUpdate(camera.position);
+    const now = performance.now();
+    const previous = lastUpdateRef.current;
+    const moved = previous.position.distanceToSquared(camera.position) > 0.0004;
+    if (!moved && now - previous.time < 250) return;
+    if (now - previous.time < 120) return;
+
+    previous.time = now;
+    previous.position.copy(camera.position);
+    onUpdate({ x: camera.position.x, y: camera.position.y, z: camera.position.z });
   });
   return null;
 }
@@ -61,16 +71,6 @@ function CameraPositioner({ cameraTarget, perspective }) {
   return null;
 }
 
-function SceneBackground({ background }) {
-  if (!background?.imageDataUrl) return null;
-  return <SceneBackgroundTexture imageUrl={background.imageDataUrl} />;
-}
-
-function SceneBackgroundTexture({ imageUrl }) {
-  const texture = useLoader(TextureLoader, imageUrl);
-  return <primitive object={texture} attach="background" />;
-}
-
 function GroundCollider({ sceneObjects }) {
   const floor = floorColliderForSceneObjects(sceneObjects);
   const halfExtents = floor.args.map((value) => value / 2);
@@ -82,8 +82,26 @@ function GroundCollider({ sceneObjects }) {
   );
 }
 
+function EditorFloor({ sceneObjects }) {
+  const floor = floorColliderForSceneObjects(sceneObjects);
+
+  return (
+    <mesh
+      position={[floor.position[0], floor.position[1] + floor.args[1] / 2 + 0.002, floor.position[2]]}
+      rotation={[-Math.PI / 2, 0, 0]}
+      raycast={() => null}
+      receiveShadow
+    >
+      <planeGeometry args={[floor.args[0], floor.args[2]]} />
+      <meshStandardMaterial color="#2c333a" transparent opacity={0.56} roughness={0.88} metalness={0.02} />
+    </mesh>
+  );
+}
+
 function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnabled, onDragStateChange }) {
   const bodyRef = useRef(null);
+  const hitboxRef = useRef(null);
+  const highlightRef = useRef(null);
   const isEditorDraggingRef = useRef(false);
   const lastRuntimePositionRef = useRef(object.transform.position);
   const [isEditorDragging, setIsEditorDragging] = useState(false);
@@ -99,9 +117,23 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
     applyObjectAppearance(object.object3d, object.appearance, viewMode);
   }, [object.appearance, object.object3d, viewMode]);
 
+  const syncOverlayGroupsToBody = (body) => {
+    const translation = body.translation();
+    const rotation = body.rotation();
+    for (const group of [hitboxRef.current, highlightRef.current]) {
+      if (!group) continue;
+      group.position.set(translation.x, translation.y, translation.z);
+      group.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    }
+  };
+
   useFrame(() => {
     const body = bodyRef.current;
-    if (!body || !shouldApplyRuntimePhysicsTransform({
+    if (!body) return;
+
+    syncOverlayGroupsToBody(body);
+
+    if (!shouldApplyRuntimePhysicsTransform({
       gravityEnabled,
       isEditorDragging: isEditorDraggingRef.current,
       isStatic: object.physics.static,
@@ -221,8 +253,9 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
           onPointerDown={selectThisObject}
           onClick={selectThisObject}
         />
-        <ObjectSelectionHitbox object={object} onSelect={selectThisObject} />
       </RigidBody>
+
+      <ObjectSelectionHitbox ref={hitboxRef} object={object} onSelect={selectThisObject} />
 
       {showControls && (
         <TransformControls
@@ -233,37 +266,44 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
         />
       )}
 
-      {isHighlighted && <ObjectHighlight object={object} />}
+      {isHighlighted && <ObjectHighlight ref={highlightRef} object={object} />}
     </>
   );
 }
 
-function ObjectSelectionHitbox({ object, onSelect }) {
-  const dimensions = object.dimensions?.map((value) => Math.max(value, 0.18)) ?? [1, 1, 1];
-  const center = object.center ?? object.transform.position ?? [0, 0, 0];
-  const transformPosition = object.transform.position ?? [0, 0, 0];
-  const localCenter = center.map((value, index) => value - transformPosition[index]);
+const ObjectSelectionHitbox = forwardRef(function ObjectSelectionHitbox({ object, onSelect }, ref) {
+  const dimensions = object.localBoundsDimensions?.map((value) => Math.max(value, 0.18)) ?? [1, 1, 1];
+  const localCenter = object.localBoundsCenter ?? [0, 0, 0];
 
   return (
-    <mesh
-      position={localCenter}
-      onPointerDown={onSelect}
-      onClick={onSelect}
+    <group
+      ref={ref}
+      position={object.transform.position}
+      rotation={object.transform.rotation}
+      scale={object.transform.scale}
     >
-      <boxGeometry args={dimensions} />
-      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-    </mesh>
+      <mesh
+        position={localCenter}
+        onPointerDown={onSelect}
+        onClick={onSelect}
+      >
+        <boxGeometry args={dimensions} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+    </group>
   );
-}
+});
 
 function ImportedPhysicsScene({ sceneObjects, selectedObjectId, onDragStateChange }) {
   const gravityEnabled = useStore((state) => state.gravityEnabled);
   const collisionsEnabled = useStore((state) => state.collisionsEnabled);
+  const floorEnabled = useStore((state) => state.floorEnabled);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
 
   return (
     <Physics gravity={gravityEnabled ? [0, -9.81, 0] : [0, 0, 0]}>
-      {collisionsEnabled && <GroundCollider sceneObjects={sceneObjects} />}
+      {floorEnabled && <EditorFloor sceneObjects={sceneObjects} />}
+      {floorEnabled && collisionsEnabled && <GroundCollider sceneObjects={sceneObjects} />}
       {sceneObjects.map((object) => (
         <ImportedSceneObject
           key={object.id}
@@ -278,21 +318,28 @@ function ImportedPhysicsScene({ sceneObjects, selectedObjectId, onDragStateChang
   );
 }
 
-function ObjectHighlight({ object }) {
-  const dimensions = object.dimensions?.map((value) => Math.max(value, 0.12)) ?? [1, 1, 1];
+const ObjectHighlight = forwardRef(function ObjectHighlight({ object }, ref) {
+  const dimensions = object.localBoundsDimensions?.map((value) => Math.max(value, 0.12)) ?? [1, 1, 1];
+  const localCenter = object.localBoundsCenter ?? [0, 0, 0];
+
   return (
-    <mesh
+    <group
+      ref={ref}
       position={object.transform.position}
       rotation={object.transform.rotation}
       scale={object.transform.scale}
-      renderOrder={20}
-      raycast={() => null}
     >
-      <boxGeometry args={dimensions} />
-      <meshBasicMaterial color="#00e5ca" wireframe transparent opacity={0.9} depthTest={false} />
-    </mesh>
+      <mesh
+        position={localCenter}
+        renderOrder={20}
+        raycast={() => null}
+      >
+        <boxGeometry args={dimensions} />
+        <meshBasicMaterial color="#00e5ca" wireframe transparent opacity={0.9} depthTest={false} />
+      </mesh>
+    </group>
   );
-}
+});
 
 function GeneratedAssetPlaceholders({ tasks, sceneObjects }) {
   return tasks
@@ -332,7 +379,6 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const highlightedObjectId = useStore((state) => state.highlightedObjectId);
-  const sceneBackground = useStore((state) => state.sceneBackground);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
   const setHighlightedObject = useStore((state) => state.setHighlightedObject);
   const renderableSceneObjects = sceneObjects.filter((object) => object.object3d);
@@ -351,11 +397,10 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
     <Canvas
       shadows={{ type: PCFShadowMap }}
       camera={{ position: [5, 3.2, 5], fov: 55, near: 0.1, far: 1000 }}
-      gl={{ antialias: true }}
-      style={{ background: '#444444' }}
+      gl={{ antialias: true, alpha: true }}
+      style={{ background: 'transparent', position: 'absolute', inset: 0, zIndex: 1 }}
       onPointerMissed={() => setSelectedObject('Room_Mesh')}
     >
-      <SceneBackground background={sceneBackground} />
       <ambientLight intensity={0.55} />
       <hemisphereLight intensity={0.85} color="#ffffff" groundColor="#4b5563" />
       <Environment preset="studio" />

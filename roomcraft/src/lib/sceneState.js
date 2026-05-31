@@ -32,6 +32,12 @@ function vec3(value, fallback) {
     : [...fallback];
 }
 
+function vec3Unit(value, fallback) {
+  return Array.isArray(value) && value.length === 3
+    ? value.map((entry) => Number(entry) || 1)
+    : [...fallback];
+}
+
 export function normalizeTransform(transform = {}, center = [0, 0, 0]) {
   return {
     position: vec3(transform.position, center),
@@ -58,13 +64,29 @@ export function normalizeAppearance(appearance = {}) {
 }
 
 export function normalizeSceneObject(object) {
+  const transform = normalizeTransform(object.transform, object.center ?? DEFAULT_TRANSFORM.position);
   return {
     ...object,
-    transform: normalizeTransform(object.transform, object.center ?? DEFAULT_TRANSFORM.position),
+    transform,
+    localBoundsCenter: vec3(object.localBoundsCenter, [0, 0, 0]),
+    localBoundsDimensions: vec3Unit(
+      object.localBoundsDimensions,
+      localBoundsDimensionsFallback(object, transform)
+    ),
     appearance: normalizeAppearance(object.appearance),
     transformRevision: object.transformRevision ?? 0,
     physicsRevision: object.physicsRevision ?? 0,
   };
+}
+
+function localBoundsDimensionsFallback(object, transform) {
+  if (!object.dimensions) return [1, 1, 1];
+  return object.dimensions.map((value, index) => Number(value || 1) / safeScale(transform.scale[index]));
+}
+
+function safeScale(value) {
+  const scale = Number(value);
+  return Math.abs(scale) > 1e-8 ? scale : 1;
 }
 
 export function updateObjectTransform(sceneObjects, objectId, patch, options = {}) {

@@ -53,7 +53,83 @@ describe("project persistence API", () => {
     expect(loaded.statusCode).toBe(200);
     expect(loaded.json()).toEqual(snapshot);
 
-    const storedFile = await readFile(join(projectStorageDir, "last-project.json"), "utf8");
+    const storedFile = await readFile(join(projectStorageDir, "last-project", "project.json"), "utf8");
     expect(JSON.parse(storedFile)).toEqual(snapshot);
+  });
+
+  it("bundles data-url GLBs and generated backgrounds into the saved project folder", async () => {
+    const projectStorageDir = mkdtempSync(join(tmpdir(), "roomcraft-projects-"));
+    app = await createApp({
+      projectStorageDir,
+      publicBaseUrl: "http://localhost:8787"
+    });
+    const snapshot = {
+      version: 1,
+      savedAt: "2026-05-30T22:00:00.000Z",
+      project: {
+        importedGlbFileName: "duck.glb",
+        sceneObjects: [{ id: "duck_01", label: "duck", source: { assetId: "asset_duck" } }],
+        assetSources: [
+          {
+            id: "asset_duck",
+            type: "data-url",
+            fileName: "duck.glb",
+            mimeType: "model/gltf-binary",
+            dataUrl: "data:model/gltf-binary;base64,Z2xi"
+          }
+        ],
+        sceneBackground: {
+          id: "background_1",
+          prompt: "neon horizon",
+          imageDataUrl: "data:image/png;base64,cG5n",
+          status: "ready",
+          error: null
+        },
+        backgroundGallery: [
+          {
+            id: "background_1",
+            prompt: "neon horizon",
+            imageDataUrl: "data:image/png;base64,cG5n"
+          }
+        ]
+      }
+    };
+
+    const saved = await app.inject({
+      method: "PUT",
+      url: "/api/projects/last",
+      payload: snapshot
+    });
+    expect(saved.statusCode).toBe(200);
+
+    const loaded = await app.inject({ method: "GET", url: "/api/projects/last" });
+    expect(loaded.statusCode).toBe(200);
+    expect(loaded.json().project.assetSources[0]).toMatchObject({
+      id: "asset_duck",
+      type: "url",
+      fileName: "duck.glb",
+      url: "http://localhost:8787/api/projects/last/assets/asset_duck.glb"
+    });
+    expect(loaded.json().project.assetSources[0].dataUrl).toBeUndefined();
+    expect(loaded.json().project.sceneBackground.imageDataUrl).toBe(
+      "http://localhost:8787/api/projects/last/backgrounds/background_1.png"
+    );
+    expect(loaded.json().project.backgroundGallery[0].imageDataUrl).toBe(
+      "http://localhost:8787/api/projects/last/backgrounds/background_1.png"
+    );
+
+    const asset = await app.inject({
+      method: "GET",
+      url: "/api/projects/last/assets/asset_duck.glb"
+    });
+    expect(asset.statusCode).toBe(200);
+    expect(asset.body).toBe("glb");
+
+    const background = await app.inject({
+      method: "GET",
+      url: "/api/projects/last/backgrounds/background_1.png"
+    });
+    expect(background.statusCode).toBe(200);
+    expect(background.body).toBe("png");
   });
 });

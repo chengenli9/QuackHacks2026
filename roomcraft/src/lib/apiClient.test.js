@@ -108,7 +108,12 @@ test('uses generated asset endpoints for task lifecycle', async () => {
     throw new Error(`Unexpected URL ${url}`);
   };
 
-  await requestGeneratedAsset({ apiBaseUrl: 'http://localhost:8787', fetchImpl, prompt: 'duck' });
+  await requestGeneratedAsset({
+    apiBaseUrl: 'http://localhost:8787',
+    fetchImpl,
+    prompt: 'duck',
+    assetType: 'environment_scene',
+  });
   await requestGeneratedAssetStatus({ apiBaseUrl: 'http://localhost:8787', fetchImpl, taskId: 'task_1' });
   await requestGeneratedAssetModel({ apiBaseUrl: 'http://localhost:8787', fetchImpl, taskId: 'task_1' });
   await requestFallbackAsset({
@@ -124,6 +129,27 @@ test('uses generated asset endpoints for task lifecycle', async () => {
     'http://localhost:8787/api/generated-assets/task_1/model',
     'http://localhost:8787/api/generated-assets/fallback',
   ]);
-  assert.deepEqual(requests[0].body, { prompt: 'duck', targetFormat: 'glb' });
+  assert.deepEqual(requests[0].body, { prompt: 'duck', assetType: 'environment_scene', targetFormat: 'glb' });
   assert.deepEqual(requests[3].body, { fallbackAssetKey: 'duck', sourcePrompt: 'duck' });
+});
+
+test('aborts slow backend requests with a clear timeout error', async () => {
+  const fetchImpl = async (_url, init = {}) =>
+    new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      });
+    });
+
+  await assert.rejects(
+    requestGeneratedAsset({
+      apiBaseUrl: 'http://localhost:8787',
+      fetchImpl,
+      prompt: 'duck',
+      timeoutMs: 5,
+    }),
+    /timed out/i
+  );
 });

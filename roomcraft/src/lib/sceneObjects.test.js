@@ -87,3 +87,20 @@ test('preserves world transform once and resets imported object roots for editor
   assert.deepEqual(object.object3d.position.toArray(), [0, 0, 0]);
   assert.deepEqual(object.object3d.scale.toArray(), [1, 1, 1]);
 });
+
+test('stores local bounds for selection overlays after imported transforms are reset', () => {
+  const root = new Object3D();
+  root.scale.set(4, 2, 3);
+  const importedMesh = mesh('offset_geometry', [1, 1, 1]);
+  importedMesh.geometry.translate(0.25, 0.5, -0.5);
+  importedMesh.position.set(1, 2, 3);
+  root.add(importedMesh);
+
+  const registry = createSceneObjectRegistry(root);
+  const [object] = registry.objects;
+
+  assert.deepEqual(object.transform.position, [4, 4, 9]);
+  assert.deepEqual(object.dimensions, [4, 2, 3]);
+  assert.deepEqual(object.localBoundsCenter, [0.25, 0.5, -0.5]);
+  assert.deepEqual(object.localBoundsDimensions, [1, 1, 1]);
+});

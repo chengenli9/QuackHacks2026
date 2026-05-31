@@ -74,7 +74,15 @@ export default function ChatPanel() {
         gravityEnabled: state.gravityEnabled,
         collisionsEnabled: state.collisionsEnabled,
       });
-      await handleOperation(response.operation);
+      if (response.operation) {
+        await handleOperation(response.operation, response.message);
+      } else {
+        updateLastMessage({
+          id: nextMessageId(),
+          sender: 'ai',
+          text: response.message ?? 'I can help edit the scene when you ask for a specific change.',
+        });
+      }
     } catch (error) {
       updateLastMessage({
         id: nextMessageId(),
@@ -86,9 +94,9 @@ export default function ChatPanel() {
     }
   };
 
-  const handleOperation = async (operation) => {
+  const handleOperation = async (operation, assistantMessage = null) => {
     if (operation.action === 'add_generated_object') {
-      await handleGeneratedAssetOperation(operation);
+      await handleGeneratedAssetOperation(operation, assistantMessage);
       return;
     }
 
@@ -107,17 +115,25 @@ export default function ChatPanel() {
       return;
     }
 
+    if (operation.action === 'generate_environment_scene') {
+      await handleEnvironmentSceneOperation(operation, assistantMessage);
+      return;
+    }
+
     applySceneOperation(operation);
     updateLastMessage({
       id: nextMessageId(),
       sender: 'ai',
-      text: labelForAppliedOperation(operation),
+      text: assistantMessage ?? labelForAppliedOperation(operation),
     });
   };
 
-  const handleGeneratedAssetOperation = async (operation) => {
+  const handleGeneratedAssetOperation = async (operation, assistantMessage = null) => {
     try {
-      const task = await requestGeneratedAsset({ prompt: operation.prompt });
+      const task = await requestGeneratedAsset({
+        prompt: operation.prompt,
+        assetType: operation.assetType,
+      });
       upsertGeneratedTask({
         ...task,
         prompt: operation.prompt,
@@ -127,7 +143,7 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
-        text: `Started Meshy generation for "${operation.prompt}".`,
+        text: assistantMessage ?? `Started Meshy generation for "${operation.prompt}".`,
       });
 
       const status = await pollGeneratedAsset(task.taskId, operation);
@@ -312,24 +328,55 @@ export default function ChatPanel() {
     }
   };
 
-  const handleBackgroundImageOperation = async (operation) => {
+  const writeAssistantStatus = (text, { append = false } = {}) => {
+    const message = { id: nextMessageId(), sender: 'ai', text };
+    if (append) {
+      addChatMessage(message);
+    } else {
+      updateLastMessage(message);
+    }
+  };
+
+  const handleBackgroundImageOperation = async (operation, options = {}) => {
+    const { appendMessage = false } = options;
     try {
       setSceneBackgroundStatus('generating');
       const background = await requestBackgroundImage({ prompt: operation.prompt });
       setSceneBackground(background);
-      updateLastMessage({
-        id: nextMessageId(),
-        sender: 'ai',
-        text: 'Generated a scene background.',
-      });
+      writeAssistantStatus('Generated a scene background.', { append: appendMessage });
+      return true;
     } catch (error) {
       setSceneBackgroundStatus('error', errorMessage(error));
-      updateLastMessage({
-        id: nextMessageId(),
-        sender: 'ai',
-        text: `Background generation failed: ${errorMessage(error)}.`,
-      });
+      writeAssistantStatus(`Background generation failed: ${errorMessage(error)}.`, { append: appendMessage });
+      return false;
     }
+  };
+
+  const handleEnvironmentSceneOperation = async (operation, assistantMessage = null) => {
+    updateLastMessage({
+      id: nextMessageId(),
+      sender: 'ai',
+      text: assistantMessage ?? `Generating environment scene "${operation.scenePrompt}".`,
+    });
+
+    const backgroundReady = await handleBackgroundImageOperation({
+      action: 'generate_background_image',
+      prompt: operation.backgroundPrompt,
+    }, { appendMessage: true });
+    addChatMessage({
+      id: nextMessageId(),
+      sender: 'ai',
+      text: backgroundReady
+        ? 'Starting Meshy environment GLB generation.'
+        : 'Continuing with Meshy environment GLB generation without a new background.',
+      typing: true,
+    });
+    await handleGeneratedAssetOperation({
+      action: 'add_generated_object',
+      prompt: operation.scenePrompt,
+      assetType: 'environment_scene',
+      placement: operation.placement ?? { mode: 'on_floor' },
+    });
   };
 
   return (
@@ -375,7 +422,7 @@ export default function ChatPanel() {
 }
 
 async function pollGeneratedAsset(taskId, operation) {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  for (let attempt = 0; attempt < 90; attempt += 1) {
     const status = await requestGeneratedAssetStatus({ taskId });
     useStore.getState().upsertGeneratedTask({
       taskId,
@@ -385,7 +432,7 @@ async function pollGeneratedAsset(taskId, operation) {
       ...status,
     });
     if (status.status === 'succeeded' || status.status === 'failed') return status;
-    await wait(1500);
+    await wait(3000);
   }
 
   return { taskId, status: 'failed', error: 'Timed out waiting for generated asset.' };

@@ -66,6 +66,7 @@ export async function loadGlbIntoScene({
   let failed = false;
   for (const object of targets) {
     try {
+      await deferToBrowser();
       const payload = dataUrlToImagePayload(renderObjectPreviewToDataUrl(object.object3d));
       const estimate = await requestVisualPhysicsEstimate({
         apiBaseUrl,
@@ -78,9 +79,14 @@ export async function loadGlbIntoScene({
       failed = true;
       addGlbImportWarning(`VLM estimate failed for ${object.label}: ${errorMessage(error)}`);
     }
+    await deferToBrowser();
   }
   setVlmEstimateStatus(failed ? 'error' : 'complete');
   return objects;
+}
+
+function deferToBrowser() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function applyGeneratedPlacement(objects, sceneObjects, placement) {

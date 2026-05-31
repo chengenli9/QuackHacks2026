@@ -8,6 +8,16 @@
   min-width: 0;
 }
 
+.backgroundLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 .canvas {
   flex: 1;
   display: block;
@@ -162,4 +172,47 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.backgroundGallery {
+  position: absolute;
+  left: var(--space-sm);
+  bottom: var(--space-sm);
+  display: flex;
+  gap: 6px;
+  max-width: min(420px, 48vw);
+  overflow-x: auto;
+  z-index: 10;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(17, 17, 17, 0.85);
+  backdrop-filter: blur(4px);
+}
+
+.backgroundThumb {
+  width: 58px;
+  height: 38px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0;
+  background: #111111;
+}
+
+.backgroundThumb:hover {
+  border-color: var(--text-secondary);
+}
+
+.backgroundThumb.activeBackground {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-ghost);
+}
+
+.backgroundThumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }

@@ -138,7 +138,7 @@ export const createApp = async (options: AppOptions = {}) => {
     registerGeneratedAssetModelRoutes(instance, assetGenerationService)
   );
   await app.register(async (instance) =>
-    registerProjectRoutes(instance, options.projectStorageDir ?? config.projectStorageDir)
+    registerProjectRoutes(instance, options.projectStorageDir ?? config.projectStorageDir, publicBaseUrl)
   );
 
   return app;

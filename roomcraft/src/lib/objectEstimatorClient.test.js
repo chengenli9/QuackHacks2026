@@ -79,3 +79,106 @@ test('returns null when the frontend has no estimator API base URL', async () =>
 
   assert.equal(result, null);
 });
+
+test('can dispatch visual estimates through a worker so API waits do not block the editor', async () => {
+  let postedMessage;
+  const workerFactory = () => {
+    const worker = {
+      onmessage: null,
+      onerror: null,
+      postMessage(message) {
+        postedMessage = message;
+        queueMicrotask(() => {
+          worker.onmessage({
+            data: {
+              ok: true,
+              profile: {
+                objectId: 'geometry_0',
+                label: 'contextual chair',
+                category: 'furniture',
+                material: 'wood',
+                massKg: 5,
+                restitution: 0.1,
+                friction: 0.7,
+                static: false,
+                breakable: false,
+                collider: 'cuboid',
+                confidence: 0.8,
+              },
+            },
+          });
+        });
+      },
+      terminate() {},
+    };
+    return worker;
+  };
+
+  const profile = await requestVisualPhysicsEstimate({
+    apiBaseUrl: 'http://localhost:8787/',
+    fetchImpl: async () => {
+      throw new Error('direct fetch should not run');
+    },
+    workerFactory,
+    object: {
+      id: 'geometry_0',
+      label: 'geometry_0',
+      dimensions: [1, 2, 3],
+      meshCount: 2,
+      vertexCount: 128,
+      triangleCount: 64,
+    },
+    imageBase64: 'abc123',
+    imageMimeType: 'image/png',
+  });
+
+  assert.equal(postedMessage.url, 'http://localhost:8787/api/estimate-object');
+  assert.equal(postedMessage.body.objectId, 'geometry_0');
+  assert.equal(profile.label, 'contextual chair');
+  assert.equal(profile.source, 'vlm');
+  assert.equal(profile.needsVisualEstimate, false);
+});
+
+test('falls back to direct fetch if visual estimate worker startup fails', async () => {
+  let requestUrl;
+  const fetchImpl = async (url) => {
+    requestUrl = url;
+    return {
+      ok: true,
+      json: async () => ({
+        objectId: 'geometry_0',
+        label: 'fallback chair',
+        category: 'furniture',
+        material: 'wood',
+        massKg: 5,
+        restitution: 0.1,
+        friction: 0.7,
+        static: false,
+        breakable: false,
+        collider: 'cuboid',
+        confidence: 0.8,
+      }),
+    };
+  };
+
+  const profile = await requestVisualPhysicsEstimate({
+    apiBaseUrl: 'http://localhost:8787/',
+    fetchImpl,
+    workerFactory: () => {
+      throw new Error('worker blocked');
+    },
+    object: {
+      id: 'geometry_0',
+      label: 'geometry_0',
+      dimensions: [1, 2, 3],
+      meshCount: 2,
+      vertexCount: 128,
+      triangleCount: 64,
+    },
+    imageBase64: 'abc123',
+    imageMimeType: 'image/png',
+  });
+
+  assert.equal(requestUrl, 'http://localhost:8787/api/estimate-object');
+  assert.equal(profile.label, 'fallback chair');
+});

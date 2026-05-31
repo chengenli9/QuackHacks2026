@@ -114,6 +114,31 @@ test('hydrateProjectSnapshot restores saved object metadata as metadata-only unt
   assert.deepEqual(state.sceneObjectTransforms.duck_01.position, [1, 2, 3]);
 });
 
+test('hydrateProjectSnapshot defaults newly added viewport fields for older saved projects', () => {
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    selectedObjectId: 'duck_01',
+    sceneObjects: [
+      object({
+        transform: { position: [5, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
+        center: [1, 0, 0],
+        localBoundsCenter: undefined,
+        localBoundsDimensions: undefined,
+      }),
+    ],
+    assetSources: [],
+  });
+  delete snapshot.project.floorEnabled;
+  delete snapshot.project.backgroundGallery;
+
+  const state = hydrateProjectSnapshot(snapshot);
+
+  assert.equal(state.floorEnabled, true);
+  assert.deepEqual(state.backgroundGallery, []);
+  assert.deepEqual(state.sceneObjects[0].localBoundsCenter, [0, 0, 0]);
+  assert.deepEqual(state.sceneObjects[0].localBoundsDimensions, [0.4, 0.3, 0.5]);
+});
+
 test('project storage round trips snapshots', async () => {
   const storage = createMemoryProjectStorage();
   const snapshot = serializeProjectState({
@@ -190,6 +215,34 @@ test('remote project storage saves compact snapshots and treats 404 as no projec
   assert.equal(requests[0].url, 'http://127.0.0.1:8787/api/projects/last');
   assert.equal(savedBody.project.assetSources[0].dataUrl, undefined);
   assert.equal(savedBody.project.assetSources[0].dataUrlUnavailable, true);
+});
+
+test('remote project storage preserves data urls by default so the backend can bundle project files', async () => {
+  let savedBody;
+  const fetchImpl = async (_url, init) => {
+    savedBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  };
+  const snapshot = serializeProjectState({
+    currentView: 'editor',
+    sceneObjects: [object()],
+    assetSources: [
+      {
+        id: 'asset_duck',
+        type: 'data-url',
+        fileName: 'duck.glb',
+        dataUrl: 'data:model/gltf-binary;base64,AAAA',
+      },
+    ],
+  });
+  const storage = createRemoteProjectStorage({
+    apiBaseUrl: 'http://127.0.0.1:8787/',
+    fetchImpl,
+  });
+
+  await writeSavedProject(snapshot, storage);
+
+  assert.equal(savedBody.project.assetSources[0].dataUrl, 'data:model/gltf-binary;base64,AAAA');
 });
 
 test('primary project storage requires the authoritative save and mirrors best-effort', async () => {

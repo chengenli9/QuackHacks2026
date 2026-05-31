@@ -47,12 +47,52 @@ describe("GeminiCommandParser", () => {
     expect(
       requestBody.generationConfig.responseJsonSchema.properties.operation.properties.action.enum
     ).toContain("update_object_appearance");
+    expect(
+      requestBody.generationConfig.responseJsonSchema.properties.operation.properties.action.enum
+    ).toContain("generate_environment_scene");
     expect(requestBody.contents[0].parts[0].text).toContain("Available tools");
+    expect(requestBody.contents[0].parts[0].text).toContain("Reply conversationally");
     expect(requestBody.contents[0].parts[0].text).toContain("current object transforms");
     expect(response.operation).toEqual({
       action: "update_object_physics",
       target: "duck_01",
       changes: { restitution: 0.9 }
+    });
+  });
+
+  it("allows Gemini to respond conversationally without forcing a tool call", async () => {
+    const parser = new GeminiCommandParser({
+      apiKey: "gemini-key",
+      model: "gemini-3.5-flash",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        message: "I can help edit objects, physics, materials, backgrounds, and exports."
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    });
+
+    await expect(
+      parser.parse({
+        message: "what can you do?",
+        sceneContext: { objects: [] }
+      })
+    ).resolves.toEqual({
+      message: "I can help edit objects, physics, materials, backgrounds, and exports."
     });
   });
 

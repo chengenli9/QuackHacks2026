@@ -16,6 +16,7 @@ const PROJECT_FIELDS = [
   'overlaysEnabled',
   'gravityEnabled',
   'collisionsEnabled',
+  'floorEnabled',
   'exportRequestedAt',
   'selectedObjectId',
   'expandedNodes',
@@ -34,6 +35,7 @@ const PROJECT_FIELDS = [
   'generatedTasks',
   'highlightedObjectId',
   'sceneBackground',
+  'backgroundGallery',
   'demoSceneUrl',
   'sourceImageUrl',
   'chatMessages',
@@ -74,6 +76,8 @@ export function hydrateProjectSnapshot(snapshot) {
   return {
     ...cloneJson(project),
     currentView: 'editor',
+    floorEnabled: project.floorEnabled ?? true,
+    backgroundGallery: cloneJson(project.backgroundGallery ?? []),
     sceneObjects,
     assetSources: cloneJson(project.assetSources ?? []),
     savedProjectUpdatedAt: snapshot.savedAt,
@@ -135,7 +139,7 @@ export function browserProjectStorage() {
   }
 
   if (root?.fetch) {
-    const remote = createRemoteProjectStorage({ fetchImpl: root.fetch.bind(root), compact: true });
+    const remote = createRemoteProjectStorage({ fetchImpl: root.fetch.bind(root), compact: false });
     storage = storage ? createPrimaryProjectStorage(remote, storage) : remote;
   }
 

@@ -98,6 +98,17 @@ test('project reset clears imported and generated demo state without leaving edi
     highlightedObjectId: 'duck_01',
     gravityEnabled: true,
     collisionsEnabled: false,
+    floorEnabled: false,
+    sceneBackground: {
+      prompt: 'neon horizon',
+      imageDataUrl: 'data:image/png;base64,BBBB',
+      status: 'ready',
+      error: null,
+      model: 'gemini-image',
+    },
+    backgroundGallery: [
+      { id: 'background_1', prompt: 'neon horizon', imageDataUrl: 'data:image/png;base64,BBBB' },
+    ],
     chatMessages: [{ id: 99, sender: 'user', text: 'changed' }],
   });
 
@@ -115,7 +126,53 @@ test('project reset clears imported and generated demo state without leaving edi
   assert.equal(state.highlightedObjectId, null);
   assert.equal(state.gravityEnabled, false);
   assert.equal(state.collisionsEnabled, true);
+  assert.equal(state.floorEnabled, true);
+  assert.deepEqual(state.backgroundGallery, []);
+  assert.equal(state.sceneBackground.status, 'idle');
   assert.equal(state.chatMessages[0].sender, 'ai');
+});
+
+test('background gallery keeps generated backgrounds selectable without replacing history', () => {
+  useStore.setState(useStore.getInitialState(), true);
+
+  useStore.getState().setSceneBackground({
+    prompt: 'deep starry night',
+    imageDataUrl: 'data:image/png;base64,AAAA',
+    model: 'gemini-image',
+  });
+  useStore.getState().setSceneBackground({
+    prompt: 'neon horizon',
+    imageDataUrl: 'data:image/png;base64,BBBB',
+    model: 'gemini-image',
+  });
+
+  let state = useStore.getState();
+  assert.equal(state.backgroundGallery.length, 2);
+  assert.equal(state.sceneBackground.prompt, 'neon horizon');
+
+  useStore.getState().selectSceneBackground(state.backgroundGallery[0].id);
+
+  state = useStore.getState();
+  assert.equal(state.sceneBackground.prompt, 'deep starry night');
+  assert.equal(state.sceneBackground.imageDataUrl, 'data:image/png;base64,AAAA');
+});
+
+test('background gallery dedupes repeated generated backgrounds and keeps a bounded history', () => {
+  useStore.setState(useStore.getInitialState(), true);
+
+  for (let index = 0; index < 14; index += 1) {
+    useStore.getState().setSceneBackground({
+      id: index === 13 ? 'background_5' : undefined,
+      prompt: `background ${index}`,
+      imageDataUrl: `data:image/png;base64,${index === 13 ? 5 : index}`,
+      model: 'gemini-image',
+    });
+  }
+
+  const state = useStore.getState();
+  assert.equal(state.backgroundGallery.length, 12);
+  assert.equal(state.backgroundGallery.filter((background) => background.id === 'background_5').length, 1);
+  assert.equal(state.sceneBackground.id, 'background_5');
 });
 
 test('project save and load round trips editor metadata without runtime object3d values', async () => {

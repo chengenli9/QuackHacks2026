@@ -8,6 +8,7 @@ export const styleSchema = z.enum(["realistic", "lowpoly", "cartoon"]);
 export const textAssetGenerationInputSchema = z.object({
   prompt: z.string().trim().min(1).max(600),
   style: styleSchema.optional(),
+  assetType: z.enum(["object", "environment_scene"]).optional(),
   targetFormat: z.literal("glb")
 });
 
@@ -134,6 +135,12 @@ export const sceneOperationSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("generate_background_image"),
     prompt: z.string().trim().min(1).max(600)
+  }),
+  z.object({
+    action: z.literal("generate_environment_scene"),
+    scenePrompt: z.string().trim().min(1).max(600),
+    backgroundPrompt: z.string().trim().min(1).max(600),
+    placement: assetPlacementSchema.default({ mode: "on_floor" })
   })
 ]);
 
@@ -159,9 +166,14 @@ export const commandRequestSchema = z.object({
     .default({ objects: [] })
 });
 
-export const commandResponseSchema = z.object({
-  operation: sceneOperationSchema
-});
+export const commandResponseSchema = z
+  .object({
+    operation: sceneOperationSchema.optional(),
+    message: z.string().trim().min(1).max(1000).optional()
+  })
+  .refine((value) => value.operation || value.message, {
+    message: "Command response must include an operation or a message"
+  });
 
 export const objectCategorySchema = z.enum([
   "toy",

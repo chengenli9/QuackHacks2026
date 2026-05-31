@@ -40,6 +40,11 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
     });
   }
 
+  const environmentScene = parseEnvironmentSceneCommand(message, normalized);
+  if (environmentScene) {
+    return environmentScene;
+  }
+
   const background = parseBackgroundCommand(message, normalized);
   if (background) {
     return background;
@@ -86,8 +91,57 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
   );
 };
 
-export const buildCommandResponse = (input: CommandRequest) =>
-  commandResponseSchema.parse({ operation: parseSceneCommand(input) });
+export const buildCommandResponse = async (input: CommandRequest) => {
+  try {
+    return commandResponseSchema.parse({ operation: parseSceneCommand(input) });
+  } catch (error) {
+    if (error instanceof HttpError && error.code === "UnsupportedCommand") {
+      return commandResponseSchema.parse({
+        message:
+          "I can chat about the scene and use editor tools when you ask me to change it: add objects, move or resize them, edit physics/materials, toggle gravity/collisions, generate backgrounds, create environment scenes, and export."
+      });
+    }
+    throw error;
+  }
+};
+
+const parseEnvironmentSceneCommand = (
+  message: string,
+  normalized: string
+): SceneOperation | undefined => {
+  if (!/\b(add|create|generate|make|build)\b/.test(normalized)) return undefined;
+  const hasEnvironmentSubject = /\b(environment|room|apartment|landscape|world)\b/.test(normalized);
+  const hasSceneSubject = /\bscene\b/.test(normalized) && !/\bbackground|backdrop|sky|horizon\b/.test(normalized);
+  if (!hasEnvironmentSubject && !hasSceneSubject) return undefined;
+
+  const scenePrompt = message
+    .replace(/^\s*(please\s+)?(add|create|generate|make|build)\s+/i, "")
+    .replace(/^(a|an|the)\s+/i, "")
+    .replace(/[.!?]+$/, "")
+    .trim();
+  const prompts = splitEnvironmentPrompts(scenePrompt || message.trim());
+
+  return validateOperation({
+    action: "generate_environment_scene",
+    scenePrompt: prompts.scenePrompt,
+    backgroundPrompt: prompts.backgroundPrompt,
+    placement: { mode: "on_floor" }
+  });
+};
+
+function splitEnvironmentPrompts(prompt: string) {
+  const match = prompt.match(/\s+with\s+(?:a|an|the)?\s*(.+?\b(?:background|backdrop|sky|horizon))$/i);
+  if (!match || match.index === undefined) {
+    return { scenePrompt: prompt, backgroundPrompt: prompt };
+  }
+
+  const scenePrompt = prompt.slice(0, match.index).trim();
+  const backgroundPrompt = match[1].trim();
+  return {
+    scenePrompt: scenePrompt || prompt,
+    backgroundPrompt: backgroundPrompt || scenePrompt || prompt
+  };
+}
 
 const parseBackgroundCommand = (
   message: string,

@@ -31,6 +31,7 @@ const DEFAULT_TRANSFORMS = {
   Scene: { position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
   ChaoMan: { position: [0, 0.85, 0], rotation: [0, 0, 0], scale: [1, 1, 1] },
 };
+const BACKGROUND_GALLERY_LIMIT = 12;
 
 const resettableProjectState = () => ({
   leftPanelTab: 'import',
@@ -41,6 +42,7 @@ const resettableProjectState = () => ({
   overlaysEnabled: true,
   gravityEnabled: false,
   collisionsEnabled: true,
+  floorEnabled: true,
   exportRequestedAt: null,
   selectedObjectId: 'Room_Mesh',
   expandedNodes: ['Scene', 'Room_Mesh', 'Lights'],
@@ -65,6 +67,7 @@ const resettableProjectState = () => ({
     error: null,
     model: null,
   },
+  backgroundGallery: [],
   demoSceneUrl: '/chaoman.glb',
   sourceImageUrl: null,
   chatMessages: DEFAULT_CHAT_MESSAGES,
@@ -111,6 +114,27 @@ function upsertAssetSource(assetSources, assetSource) {
     : [...assetSources, assetSource];
 }
 
+function backgroundGalleryEntry(background) {
+  return {
+    id: background.id ?? `background_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    prompt: background.prompt,
+    imageDataUrl: background.imageDataUrl,
+    model: background.model ?? null,
+    revisedPrompt: background.revisedPrompt ?? null,
+    createdAt: background.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function upsertBackgroundGallery(gallery, entry) {
+  const next = [
+    ...(gallery ?? []).filter((background) =>
+      background.id !== entry.id && background.imageDataUrl !== entry.imageDataUrl
+    ),
+    entry,
+  ];
+  return next.slice(Math.max(0, next.length - BACKGROUND_GALLERY_LIMIT));
+}
+
 const useStore = create((set, get) => ({
   // App navigation
   currentView: 'landing',
@@ -137,6 +161,7 @@ const useStore = create((set, get) => ({
   toggleOverlays: () => set((state) => ({ overlaysEnabled: !state.overlaysEnabled })),
   setGravityEnabled: (gravityEnabled) => set({ gravityEnabled }),
   setCollisionsEnabled: (collisionsEnabled) => set({ collisionsEnabled }),
+  setFloorEnabled: (floorEnabled) => set({ floorEnabled }),
   requestSceneExport: () =>
     set((state) => ({ exportRequestedAt: (state.exportRequestedAt ?? 0) + 1 })),
 
@@ -152,14 +177,28 @@ const useStore = create((set, get) => ({
       },
     })),
   setSceneBackground: (background) =>
-    set({
-      sceneBackground: {
-        prompt: background.prompt,
-        imageDataUrl: background.imageDataUrl,
-        status: 'ready',
-        error: null,
-        model: background.model ?? null,
-      },
+    set((state) => {
+      const entry = backgroundGalleryEntry(background);
+      return {
+        sceneBackground: {
+          ...entry,
+          status: 'ready',
+          error: null,
+        },
+        backgroundGallery: upsertBackgroundGallery(state.backgroundGallery, entry),
+      };
+    }),
+  selectSceneBackground: (backgroundId) =>
+    set((state) => {
+      const background = state.backgroundGallery.find((entry) => entry.id === backgroundId);
+      if (!background) return state;
+      return {
+        sceneBackground: {
+          ...background,
+          status: 'ready',
+          error: null,
+        },
+      };
     }),
   toggleNode: (id) =>
     set((state) => ({
@@ -303,6 +342,7 @@ const useStore = create((set, get) => ({
         error: null,
         model: null,
       },
+      backgroundGallery: [],
     }),
 
   // Project persistence

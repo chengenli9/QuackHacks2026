@@ -106,6 +106,28 @@ describe("MeshyProvider", () => {
     });
   });
 
+  it("prompts Meshy for complete environment scenes when requested", async () => {
+    const fetch = vi.fn(async () => jsonResponse({ result: "meshy_scene_task" }));
+    const provider = new MeshyProvider({
+      apiKey: "secret",
+      baseUrl: "https://api.meshy.ai",
+      fetch
+    });
+
+    await provider.generateFromText({
+      prompt: "neon sci-fi apartment",
+      assetType: "environment_scene",
+      targetFormat: "glb"
+    });
+
+    const [, init] = fetch.mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toEqual({
+      mode: "preview",
+      prompt: "neon sci-fi apartment, complete 3D environment scene, cohesive floor and room-scale props",
+      target_formats: ["glb"]
+    });
+  });
+
   it("surfaces Meshy API errors with response details", async () => {
     const fetch = vi.fn(async () =>
       jsonResponse({ message: "Insufficient credits" }, false, 402)

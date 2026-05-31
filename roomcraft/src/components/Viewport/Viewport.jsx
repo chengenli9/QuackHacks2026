@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { ArrowDown, Box, MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
+import { ArrowDown, Box, Layers, MousePointer2, Move, RotateCcw, Maximize2, ChevronDown, Grid3x3 } from 'lucide-react';
 import useStore from '../../store/useStore';
 import ThreeScene from './ThreeScene';
 import styles from './Viewport.module.css';
@@ -28,6 +28,11 @@ export default function Viewport() {
     setGravityEnabled,
     collisionsEnabled,
     setCollisionsEnabled,
+    floorEnabled,
+    setFloorEnabled,
+    sceneBackground,
+    backgroundGallery,
+    selectSceneBackground,
     sourceImageUrl,
   } = useStore();
   const [camPos, setCamPos] = useState({ x: 5.0, y: 3.2, z: 5.0 });
@@ -70,7 +75,13 @@ export default function Viewport() {
 
   return (
     <div className={styles.viewport}>
-      {/* Three.js Canvas */}
+      {sceneBackground?.imageDataUrl && (
+        <div
+          className={styles.backgroundLayer}
+          style={{ backgroundImage: `url("${sceneBackground.imageDataUrl}")` }}
+        />
+      )}
+
       <ThreeScene onCameraUpdate={handleCameraUpdate} cameraTarget={cameraTarget} />
 
       {/* Viewport Top Toolbar */}
@@ -140,6 +151,13 @@ export default function Viewport() {
         >
           <Box size={12} /> Collisions
         </button>
+
+        <button
+          className={`${styles.toolbarBtn} ${floorEnabled ? styles.active : ''}`}
+          onClick={() => setFloorEnabled(!floorEnabled)}
+        >
+          <Layers size={12} /> Floor
+        </button>
       </div>
 
       {/* Transform Toolbar */}
@@ -177,6 +195,23 @@ export default function Viewport() {
       {sourceImageUrl && (
         <div className={styles.sourcePreview}>
           <img src={sourceImageUrl} alt="Source scene" />
+        </div>
+      )}
+
+      {backgroundGallery?.length > 0 && (
+        <div className={styles.backgroundGallery} aria-label="Background gallery">
+          {backgroundGallery.map((background) => (
+            <button
+              key={background.id}
+              className={`${styles.backgroundThumb} ${
+                sceneBackground?.id === background.id ? styles.activeBackground : ''
+              }`}
+              title={background.prompt ?? 'Generated background'}
+              onClick={() => selectSceneBackground(background.id)}
+            >
+              <img src={background.imageDataUrl} alt="" />
+            </button>
+          ))}
         </div>
       )}
     </div>

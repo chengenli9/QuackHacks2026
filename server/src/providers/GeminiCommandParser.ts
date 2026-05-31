@@ -38,12 +38,21 @@ const sceneOperationJsonSchema = {
             "toggle_collisions",
             "export_scene",
             "relabel_object",
-            "generate_background_image"
+            "generate_background_image",
+            "generate_environment_scene"
           ]
         },
         prompt: {
           type: "string",
           description: "Prompt for add_generated_object or generate_background_image."
+        },
+        scenePrompt: {
+          type: "string",
+          description: "Prompt for generate_environment_scene Meshy scene GLB generation."
+        },
+        backgroundPrompt: {
+          type: "string",
+          description: "Prompt for generate_environment_scene background image generation."
         },
         fallbackAssetKey: {
           type: "string",
@@ -53,7 +62,7 @@ const sceneOperationJsonSchema = {
           type: "object",
           additionalProperties: false,
           properties: {
-            mode: { type: "string", enum: ["on_floor", "on_object", "absolute"] },
+            mode: { type: "string", enum: ["on_floor", "on_object", "at_position"] },
             target: { type: "string" },
             position: {
               type: "array",
@@ -106,9 +115,16 @@ const sceneOperationJsonSchema = {
         label: { type: "string" }
       },
       required: ["action"]
+    },
+    message: {
+      type: "string",
+      description: "Conversational answer when no editor tool is needed."
     }
   },
-  required: ["operation"]
+  anyOf: [
+    { required: ["operation"] },
+    { required: ["message"] }
+  ]
 };
 
 export class GeminiCommandParser implements CommandParser {
@@ -141,7 +157,7 @@ export class GeminiCommandParser implements CommandParser {
           parts: [
             {
               text:
-                "Convert the user's editor request into one validated scene operation. Available tools: add_generated_object(prompt, placement, fallbackAssetKey?), add_local_object(fallbackAssetKey, placement), remove_object(target), move_object(target, position), rotate_object(target, rotation), scale_object(target, scale), update_object_physics(target, changes), update_object_appearance(target, changes), toggle_gravity(enabled), toggle_collisions(enabled), export_scene(), relabel_object(target, label), generate_background_image(prompt). You must include every listed argument required by the chosen tool. Use only object IDs from sceneContext when targeting existing objects. Use current object transforms, dimensions, semantic labels, material metadata, static flags, gravity/collision intent, and relative placement words to choose a target. For add requests, prefer add_generated_object with placement on the mentioned object when possible. For background/sky/horizon/backdrop requests, use generate_background_image. Return only JSON.\n\n" +
+                "You are an agentic 3D scene editor assistant. Reply conversationally when the user is asking a question or discussing options. Choose exactly one editor tool only when the user asks you to change the scene. Available tools: add_generated_object(prompt, placement, fallbackAssetKey?), add_local_object(fallbackAssetKey, placement), remove_object(target), move_object(target, position), rotate_object(target, rotation), scale_object(target, scale), update_object_physics(target, changes), update_object_appearance(target, changes), toggle_gravity(enabled), toggle_collisions(enabled), export_scene(), relabel_object(target, label), generate_background_image(prompt), generate_environment_scene(scenePrompt, backgroundPrompt, placement). Use generate_environment_scene when the user asks for a complete room/world/environment GLB plus matching background. You must include every listed argument required by the chosen tool. Use only object IDs from sceneContext when targeting existing objects. Use current object transforms, dimensions, semantic labels, material metadata, static flags, gravity/collision intent, and relative placement words to choose a target. For add requests, prefer add_generated_object with placement on the mentioned object when possible. For background/sky/horizon/backdrop requests, use generate_background_image. Return only JSON with either operation or message.\n\n" +
                 JSON.stringify(request)
             }
           ]
@@ -155,6 +171,8 @@ export class GeminiCommandParser implements CommandParser {
 }
 
 function normalizeCommandResponse(response: CommandResponse): CommandResponse {
+  if (!response.operation) return response;
+
   if (response.operation.action !== "update_object_appearance") {
     return response;
   }

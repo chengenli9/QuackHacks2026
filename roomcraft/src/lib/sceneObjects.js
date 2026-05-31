@@ -24,6 +24,7 @@ export function createSceneObjectRegistry(root, { sourceFileName = null, existin
     const bounds = boundsFor(node);
     const meshStats = meshStatsFor(node);
     const transform = transformFor(node);
+    const localBounds = localBoundsFor(bounds, transform);
 
     node.userData.roomcraftObjectId = id;
     resetObjectRootTransform(node);
@@ -46,6 +47,8 @@ export function createSceneObjectRegistry(root, { sourceFileName = null, existin
       triangleCount: meshStats.triangleCount,
       dimensions: bounds.dimensions,
       center: bounds.center,
+      localBoundsCenter: localBounds.center,
+      localBoundsDimensions: localBounds.dimensions,
       transform,
       physics: inferPhysicsProfile({ label, dimensions: bounds.dimensions }),
       appearance: {
@@ -200,6 +203,27 @@ function boundsFor(node) {
     dimensions: [size.x, size.y, size.z],
     center: [center.x, center.y, center.z],
   };
+}
+
+function localBoundsFor(bounds, transform) {
+  const scale = transform.scale ?? [1, 1, 1];
+  return {
+    center: bounds.center.map((value, index) =>
+      cleanNumber((value - transform.position[index]) / safeScale(scale[index]))
+    ),
+    dimensions: bounds.dimensions.map((value, index) =>
+      cleanNumber(value / safeScale(scale[index]))
+    ),
+  };
+}
+
+function safeScale(value) {
+  const scale = Number(value);
+  return Math.abs(scale) > 1e-8 ? scale : 1;
+}
+
+function cleanNumber(value) {
+  return Math.abs(value) < 1e-10 ? 0 : value;
 }
 
 function meshStatsFor(node) {

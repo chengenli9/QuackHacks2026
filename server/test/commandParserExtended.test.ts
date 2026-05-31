@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FallbackCommandParser } from "../src/services/fallbackCommandParser.js";
-import { parseSceneCommand } from "../src/services/commandParser.js";
+import { buildCommandResponse, parseSceneCommand } from "../src/services/commandParser.js";
 
 const sceneContext = {
   objects: [
@@ -106,6 +106,43 @@ describe("extended local command parser", () => {
     ).toEqual({
       action: "generate_background_image",
       prompt: "deep starry night background"
+    });
+  });
+
+  it("parses environment scene generation as a scene GLB plus grid-suited background", () => {
+    expect(
+      parseSceneCommand({
+        message: "create a neon sci-fi apartment environment scene",
+        sceneContext
+      })
+    ).toEqual({
+      action: "generate_environment_scene",
+      scenePrompt: "neon sci-fi apartment environment scene",
+      backgroundPrompt: "neon sci-fi apartment environment scene",
+      placement: { mode: "on_floor" }
+    });
+
+    expect(
+      parseSceneCommand({
+        message: "create a neon sci-fi apartment environment with a deep starry night background",
+        sceneContext
+      })
+    ).toEqual({
+      action: "generate_environment_scene",
+      scenePrompt: "neon sci-fi apartment environment",
+      backgroundPrompt: "deep starry night background",
+      placement: { mode: "on_floor" }
+    });
+  });
+
+  it("returns conversational messages when no scene tool is needed", async () => {
+    await expect(
+      buildCommandResponse({
+        message: "what can you help me do?",
+        sceneContext
+      })
+    ).resolves.toEqual({
+      message: expect.stringContaining("I can")
     });
   });
 
