@@ -21,6 +21,7 @@ export async function loadGlbIntoScene({
   sourcePrompt,
   placement,
   manifest,
+  assetSource,
 }) {
   const loader = new GLTFLoader();
   setGlbImportStatus('loading');
@@ -35,6 +36,10 @@ export async function loadGlbIntoScene({
     sourcePrompt,
     source: {
       ...(object.source ?? {}),
+      assetId: assetSource?.id ?? object.source?.assetId,
+      type: assetSource?.type ?? object.source?.type,
+      fileName: assetSource?.fileName ?? object.source?.fileName ?? fileName,
+      url: assetSource?.type === 'url' ? assetSource.url : object.source?.url,
       prompt: sourcePrompt,
     },
   }));
@@ -43,7 +48,12 @@ export async function loadGlbIntoScene({
     : { objects: objectsWithSource, warnings: [] };
   const objects = manifestResult.objects;
 
-  addImportedScene({ fileName, objects, warnings: [...registry.warnings, ...manifestResult.warnings] });
+  addImportedScene({
+    fileName,
+    objects,
+    warnings: [...registry.warnings, ...manifestResult.warnings],
+    assetSource,
+  });
 
   const targets = objects.filter((object) => object.physics.needsVisualEstimate || sourcePrompt);
   if (targets.length === 0) {

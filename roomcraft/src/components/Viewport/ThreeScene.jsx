@@ -85,6 +85,7 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
   const setSceneObjectRuntimeTransform = useStore((state) => state.setSceneObjectRuntimeTransform);
 
   useEffect(() => {
+    if (!object.object3d) return;
     applyObjectAppearance(object.object3d, object.appearance, viewMode);
   }, [object.appearance, object.object3d, viewMode]);
 
@@ -120,6 +121,7 @@ function ImportedSceneObject({ object, isSelected, isHighlighted, collisionsEnab
 
   const commitTransform = () => {
     const target = object.object3d;
+    if (!target) return;
     target.updateWorldMatrix(true, false);
 
     const position = new Vector3();
@@ -277,6 +279,7 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
   const overlaysEnabled = useStore((state) => state.overlaysEnabled);
   const generatedTasks = useStore((state) => state.generatedTasks);
   const setSelectedObject = useStore((state) => state.setSelectedObject);
+  const renderableSceneObjects = sceneObjects.filter((object) => object.object3d);
 
   return (
     <Canvas
@@ -318,9 +321,9 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
         />
       )}
 
-      {sceneObjects.length > 0 && (
+      {renderableSceneObjects.length > 0 && (
         <ImportedPhysicsScene
-          sceneObjects={sceneObjects}
+          sceneObjects={renderableSceneObjects}
           selectedObjectId={selectedObjectId}
           onDragStateChange={setIsTransforming}
         />

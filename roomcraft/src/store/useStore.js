@@ -8,6 +8,12 @@ import {
   updateObjectTransform,
 } from '../lib/sceneState.js';
 import { applyManifestToSceneObjects } from '../lib/manifestImport.js';
+import {
+  hydrateProjectSnapshot,
+  readSavedProject,
+  serializeProjectState,
+  writeSavedProject,
+} from '../lib/projectPersistence.js';
 
 const DEFAULT_CHAT_MESSAGES = [
   { id: 1, sender: 'ai', text: 'Import a GLB scene, then ask me to edit objects or add generated assets.' },
@@ -49,11 +55,16 @@ const resettableProjectState = () => ({
   manifestWarnings: [],
   vlmEstimateStatus: 'idle',
   sceneObjects: [],
+  assetSources: [],
   generatedTasks: [],
   highlightedObjectId: null,
   demoSceneUrl: '/chaoman.glb',
   sourceImageUrl: null,
   chatMessages: DEFAULT_CHAT_MESSAGES,
+  savedProjectStatus: 'idle',
+  savedProjectError: null,
+  savedProjectUpdatedAt: null,
+  restoredProjectNotice: null,
 });
 
 function transformMapForObjects(objects) {
@@ -85,10 +96,26 @@ function updateTransformMap(sceneObjectTransforms, id, partial) {
   };
 }
 
-const useStore = create((set) => ({
+function upsertAssetSource(assetSources, assetSource) {
+  if (!assetSource?.id) return assetSources;
+  const exists = assetSources.some((asset) => asset.id === assetSource.id);
+  return exists
+    ? assetSources.map((asset) => (asset.id === assetSource.id ? { ...asset, ...assetSource } : asset))
+    : [...assetSources, assetSource];
+}
+
+const useStore = create((set, get) => ({
   // App navigation
   currentView: 'landing',
+  openSavedProjectRequestId: 0,
   setCurrentView: (view) => set({ currentView: view }),
+  requestOpenSavedProject: () =>
+    set((state) => ({
+      currentView: 'editor',
+      openSavedProjectRequestId: state.openSavedProjectRequestId + 1,
+      restoredProjectNotice: 'Opening saved project...',
+      savedProjectError: null,
+    })),
 
   ...resettableProjectState(),
 
@@ -152,12 +179,13 @@ const useStore = create((set) => ({
   setVlmEstimateStatus: (status) => set({ vlmEstimateStatus: status }),
   addGlbImportWarning: (warning) =>
     set((state) => ({ glbImportWarnings: [...state.glbImportWarnings, warning] })),
-  setImportedScene: ({ fileName, objects, warnings = [] }) =>
+  setImportedScene: ({ fileName, objects, warnings = [], assetSource = null }) =>
     set((state) => {
       const normalizedObjects = objects.map(normalizeSceneObject);
       return {
         importedGlbFileName: fileName,
         sceneObjects: normalizedObjects,
+        assetSources: assetSource ? [assetSource] : state.assetSources,
         glbImportStatus: 'ready',
         glbImportError: null,
         glbImportWarnings: warnings,
@@ -170,12 +198,13 @@ const useStore = create((set) => ({
         },
       };
     }),
-  addImportedScene: ({ fileName, objects, warnings = [] }) =>
+  addImportedScene: ({ fileName, objects, warnings = [], assetSource = null }) =>
     set((state) => {
       const normalizedObjects = objects.map(normalizeSceneObject);
       return {
         importedGlbFileName: fileName,
         sceneObjects: [...state.sceneObjects, ...normalizedObjects],
+        assetSources: upsertAssetSource(state.assetSources, assetSource),
         glbImportStatus: 'ready',
         glbImportError: null,
         glbImportWarnings: [...state.glbImportWarnings, ...warnings],
@@ -239,8 +268,86 @@ const useStore = create((set) => ({
       manifestWarnings: [],
       vlmEstimateStatus: 'idle',
       sceneObjects: [],
+      assetSources: [],
       selectedObjectId: 'Room_Mesh',
       highlightedObjectId: null,
+    }),
+
+  // Project persistence
+  saveProject: async (storage) => {
+    try {
+      const snapshot = serializeProjectState(get());
+      await writeSavedProject(snapshot, storage);
+      set({
+        savedProjectStatus: 'saved',
+        savedProjectError: null,
+        savedProjectUpdatedAt: snapshot.savedAt,
+        restoredProjectNotice: 'Project saved locally.',
+      });
+      return snapshot;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      set({
+        savedProjectStatus: 'error',
+        savedProjectError: message,
+        restoredProjectNotice: null,
+      });
+      throw error;
+    }
+  },
+  loadSavedProject: async (storage) => {
+    try {
+      const snapshot = await readSavedProject(storage);
+      if (!snapshot) {
+        set({
+          currentView: 'editor',
+          savedProjectStatus: 'not_found',
+          savedProjectError: 'No saved project was found in this browser.',
+          restoredProjectNotice: null,
+        });
+        return null;
+      }
+
+      set({
+        ...hydrateProjectSnapshot(snapshot),
+        savedProjectStatus: 'loaded',
+        savedProjectError: null,
+      });
+      return snapshot;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      set({
+        currentView: 'editor',
+        savedProjectStatus: 'error',
+        savedProjectError: message,
+        restoredProjectNotice: null,
+      });
+      throw error;
+    }
+  },
+  setSavedProjectStatus: (status, error = null) =>
+    set({ savedProjectStatus: status, savedProjectError: error }),
+  restoreProjectSceneObjects: ({ objects = [], warnings = [] }) =>
+    set((state) => {
+      const normalizedObjects = objects.map(normalizeSceneObject);
+      return {
+        sceneObjects: normalizedObjects,
+        sceneObjectTransforms: {
+          ...state.sceneObjectTransforms,
+          ...transformMapForObjects(normalizedObjects),
+        },
+        glbImportStatus: normalizedObjects.length > 0 ? 'ready' : state.glbImportStatus,
+        glbImportWarnings: [...state.glbImportWarnings, ...warnings],
+        selectedObjectId: normalizedObjects.some((object) => object.id === state.selectedObjectId)
+          ? state.selectedObjectId
+          : normalizedObjects[0]?.id ?? 'Room_Mesh',
+        highlightedObjectId: normalizedObjects[0]?.id ?? null,
+        expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+        savedProjectStatus: warnings.length > 0 ? 'restored_with_warnings' : 'restored',
+        restoredProjectNotice: warnings.length > 0
+          ? 'Project restored with warnings.'
+          : 'Project restored.',
+      };
     }),
 
   // Generated assets

@@ -5,6 +5,7 @@ import useStore from '../../store/useStore';
 import { requestFallbackAsset } from '../../lib/apiClient';
 import { generatedTaskDisplayStatus } from '../../lib/generatedTaskState';
 import { loadGlbIntoScene } from '../../lib/glbImport';
+import { createProjectAssetSource } from '../../lib/projectPersistence';
 import styles from './LeftPanel.module.css';
 
 function errorMessage(error) {
@@ -39,6 +40,15 @@ function vlmStatusLabel(status) {
   }
 }
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error(`Could not read ${file.name}.`));
+    reader.onload = () => resolve(reader.result);
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function ImportPanel() {
   const {
     importedGlbFileName,
@@ -52,6 +62,9 @@ export default function ImportPanel() {
     glbImportWarnings,
     vlmEstimateStatus,
     generatedTasks,
+    savedProjectStatus,
+    savedProjectError,
+    restoredProjectNotice,
     demoSceneUrl,
     setGlbImportStatus,
     setVlmEstimateStatus,
@@ -65,7 +78,7 @@ export default function ImportPanel() {
   } = useStore();
   const lastHandledGlbImportRequest = useRef(0);
 
-  const importFromUrl = useCallback(async ({ url, fileName, sourcePrompt, placement, manifest }) => {
+  const importFromUrl = useCallback(async ({ url, fileName, sourcePrompt, placement, manifest, assetSource }) => {
     try {
       return await loadGlbIntoScene({
         sourceUrl: url,
@@ -79,6 +92,7 @@ export default function ImportPanel() {
         sourcePrompt,
         placement,
         manifest,
+        assetSource,
       });
     } catch (error) {
       setGlbImportStatus('error', errorMessage(error));
@@ -94,12 +108,13 @@ export default function ImportPanel() {
   ]);
 
   const importFile = useCallback(async (file, manifest) => {
-    const url = URL.createObjectURL(file);
-    try {
-      await importFromUrl({ url, fileName: file.name, manifest });
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    const dataUrl = await fileToDataUrl(file);
+    const assetSource = createProjectAssetSource({
+      fileName: file.name,
+      dataUrl,
+      mimeType: file.type || 'model/gltf-binary',
+    });
+    await importFromUrl({ url: dataUrl, fileName: file.name, manifest, assetSource });
   }, [importFromUrl]);
 
   const readManifestFile = useCallback(async (file) => {
@@ -154,11 +169,17 @@ export default function ImportPanel() {
         sourcePrompt: task.prompt,
       });
       upsertGeneratedTask({ ...task, ...asset, status: 'fallback-ready' });
+      const assetSource = createProjectAssetSource({
+        fileName: `${asset.id}.glb`,
+        sourceUrl: asset.glbUrl,
+        type: 'url',
+      });
       await importFromUrl({
         url: asset.glbUrl,
         fileName: `${asset.id}.glb`,
         sourcePrompt: asset.sourcePrompt,
         placement: task.placement,
+        assetSource,
       });
       upsertGeneratedTask({ ...task, ...asset, status: 'ready' });
     } catch (error) {
@@ -167,7 +188,13 @@ export default function ImportPanel() {
   };
 
   const handleDemoScene = () => {
-    void importFromUrl({ url: demoSceneUrl, fileName: demoSceneUrl.split('/').pop() || 'demo-scene.glb' });
+    const fileName = demoSceneUrl.split('/').pop() || 'demo-scene.glb';
+    const assetSource = createProjectAssetSource({
+      fileName,
+      sourceUrl: demoSceneUrl,
+      type: 'url',
+    });
+    void importFromUrl({ url: demoSceneUrl, fileName, assetSource });
   };
 
   return (
@@ -203,6 +230,13 @@ export default function ImportPanel() {
         </div>
       )}
 
+      {(restoredProjectNotice || savedProjectError) && (
+        <div className={`${styles.importNotice} ${savedProjectStatus === 'error' ? styles.errorNotice : ''}`}>
+          <Sparkles size={14} />
+          <span>{savedProjectError ?? restoredProjectNotice}</span>
+        </div>
+      )}
+
       {importedGlbFileName && (
         <div className={styles.importSummary}>
           <button className={styles.clearImportBtn} title="Clear imported GLB" onClick={clearImportedScene}>
@@ -214,9 +248,14 @@ export default function ImportPanel() {
             <span>{statusLabel(glbImportStatus)}</span>
           </div>
           <div className={styles.importMetaRow}>
-            <span>{sceneObjects.filter((object) => object.physics.needsVisualEstimate).length} need VLM</span>
+            <span>{sceneObjects.filter((object) => object.physics?.needsVisualEstimate).length} need VLM</span>
             <span>{vlmStatusLabel(vlmEstimateStatus)}</span>
           </div>
+          {sceneObjects.some((object) => object.restoredMetadataOnly) && (
+            <div className={styles.importMetaRow}>
+              <span>Some meshes need reimport</span>
+            </div>
+          )}
         </div>
       )}
 

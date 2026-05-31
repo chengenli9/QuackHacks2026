@@ -4,6 +4,16 @@ import styles from './LandingPage.module.css';
 
 export default function LandingPage() {
   const setCurrentView = useStore((s) => s.setCurrentView);
+  const resetProject = useStore((s) => s.resetProject);
+  const requestOpenSavedProject = useStore((s) => s.requestOpenSavedProject);
+  const createProject = () => {
+    resetProject();
+    setCurrentView('editor');
+  };
+  const loadSavedProject = () => {
+    window.roomcraftOpenProjectRequested = true;
+    requestOpenSavedProject();
+  };
 
   return (
     <div className={styles.landing}>
@@ -18,7 +28,7 @@ export default function LandingPage() {
       <div className={styles.actions}>
         <button
           className={styles.card}
-          onClick={() => setCurrentView('editor')}
+          onClick={loadSavedProject}
         >
           <div className={styles.cardIcon}>
             <Plus size={24} strokeWidth={1.5} />
@@ -31,7 +41,7 @@ export default function LandingPage() {
 
         <button
           className={styles.card}
-          onClick={() => setCurrentView('editor')}
+          onClick={createProject}
         >
           <div className={styles.cardIcon}>
             <FolderOpen size={24} strokeWidth={1.5} />

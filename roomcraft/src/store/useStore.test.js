@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createMemoryProjectStorage } from '../lib/projectPersistence.js';
 import useStore from './useStore.js';
 
 test('requestGlbImport switches to the import tab and increments the import request token', () => {
@@ -10,6 +11,16 @@ test('requestGlbImport switches to the import tab and increments the import requ
   const state = useStore.getState();
   assert.equal(state.leftPanelTab, 'import');
   assert.equal(state.glbImportRequestId, 4);
+});
+
+test('requestOpenSavedProject enters the editor and increments the open project request token', () => {
+  useStore.setState(useStore.getInitialState(), true);
+
+  useStore.getState().requestOpenSavedProject();
+
+  const state = useStore.getState();
+  assert.equal(state.currentView, 'editor');
+  assert.equal(state.openSavedProjectRequestId, 1);
 });
 
 test('addImportedScene appends imported objects without removing existing scene assets', () => {
@@ -105,4 +116,60 @@ test('project reset clears imported and generated demo state without leaving edi
   assert.equal(state.gravityEnabled, false);
   assert.equal(state.collisionsEnabled, true);
   assert.equal(state.chatMessages[0].sender, 'ai');
+});
+
+test('project save and load round trips editor metadata without runtime object3d values', async () => {
+  const storage = createMemoryProjectStorage();
+  useStore.setState(useStore.getInitialState(), true);
+  useStore.setState({
+    currentView: 'editor',
+    importedGlbFileName: 'duck.glb',
+    selectedObjectId: 'duck_01',
+    gravityEnabled: true,
+    assetSources: [
+      {
+        id: 'asset_duck',
+        type: 'data-url',
+        fileName: 'duck.glb',
+        dataUrl: 'data:model/gltf-binary;base64,AAAA',
+      },
+    ],
+    sceneObjects: [
+      {
+        id: 'duck_01',
+        label: 'rubber duck',
+        object3d: { runtime: true },
+        transform: { position: [1, 2, 3], rotation: [0, 0.25, 0], scale: [1, 1, 1] },
+        transformRevision: 2,
+        physicsRevision: 1,
+        physics: { massKg: 0.2, friction: 0.7, restitution: 0.8, static: false, collider: 'cuboid' },
+        appearance: { baseColor: '#ffcc00', roughness: 0.65, metalness: 0 },
+        source: { type: 'import', fileName: 'duck.glb', assetId: 'asset_duck' },
+      },
+    ],
+    sceneObjectTransforms: {
+      duck_01: { position: [1, 2, 3], rotation: [0, 0.25, 0], scale: [1, 1, 1] },
+    },
+    chatMessages: [{ id: 2, sender: 'user', text: 'save this project' }],
+  });
+
+  await useStore.getState().saveProject(storage);
+
+  assert.equal(useStore.getState().savedProjectStatus, 'saved');
+
+  useStore.setState(useStore.getInitialState(), true);
+  const snapshot = await useStore.getState().loadSavedProject(storage);
+  const state = useStore.getState();
+
+  assert.ok(snapshot);
+  assert.equal(state.currentView, 'editor');
+  assert.equal(state.savedProjectStatus, 'loaded');
+  assert.equal(state.selectedObjectId, 'duck_01');
+  assert.equal(state.gravityEnabled, true);
+  assert.equal(state.sceneObjects[0].id, 'duck_01');
+  assert.equal(state.sceneObjects[0].object3d, undefined);
+  assert.equal(state.sceneObjects[0].restoredMetadataOnly, true);
+  assert.equal(state.sceneObjects[0].appearance.baseColor, '#ffcc00');
+  assert.equal(state.assetSources[0].dataUrl, 'data:model/gltf-binary;base64,AAAA');
+  assert.equal(state.chatMessages[0].text, 'save this project');
 });

@@ -10,6 +10,7 @@ import {
 } from '../../lib/apiClient';
 import { fallbackPromptForAssetKey } from '../../lib/fallbackAssets';
 import { loadGlbIntoScene } from '../../lib/glbImport';
+import { createProjectAssetSource } from '../../lib/projectPersistence';
 import { exportSceneArtifacts } from '../../lib/sceneExport';
 import styles from './LeftPanel.module.css';
 
@@ -138,6 +139,11 @@ export default function ChatPanel() {
       }
 
       const asset = await requestGeneratedAssetModel({ taskId: task.taskId });
+      const assetSource = createProjectAssetSource({
+        fileName: `${asset.id}.glb`,
+        sourceUrl: asset.glbUrl,
+        type: 'url',
+      });
       upsertGeneratedTask({
         ...task,
         ...status,
@@ -159,6 +165,7 @@ export default function ChatPanel() {
         addGlbImportWarning,
         sourcePrompt: asset.sourcePrompt,
         placement: operation.placement,
+        assetSource,
       });
       const selectedId = objects[0]?.id ?? null;
       if (selectedId) setHighlightedObject(selectedId);
@@ -214,6 +221,11 @@ export default function ChatPanel() {
         fallbackAssetKey: operation.fallbackAssetKey,
         sourcePrompt,
       });
+      const assetSource = createProjectAssetSource({
+        fileName: `${asset.id}.glb`,
+        sourceUrl: asset.glbUrl,
+        type: 'url',
+      });
       upsertGeneratedTask({
         taskId,
         ...asset,
@@ -234,6 +246,7 @@ export default function ChatPanel() {
         addGlbImportWarning,
         sourcePrompt: asset.sourcePrompt,
         placement: operation.placement,
+        assetSource,
       });
       const selectedId = objects[0]?.id ?? null;
       if (selectedId) setHighlightedObject(selectedId);

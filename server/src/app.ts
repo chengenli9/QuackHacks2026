@@ -19,6 +19,7 @@ import { registerEstimateObjectRoutes } from "./routes/estimateObject.js";
 import { registerGenerateAssetRoutes } from "./routes/generateAsset.js";
 import { registerGeneratedAssetModelRoutes } from "./routes/generatedAssetModel.js";
 import { registerGeneratedAssetStatusRoutes } from "./routes/generatedAssetStatus.js";
+import { registerProjectRoutes } from "./routes/projects.js";
 import { fallbackAssetKeySchema } from "./schemas.js";
 import { AssetGenerationService } from "./services/assetGenerationService.js";
 import { GeneratedAssetCache } from "./services/generatedAssetCache.js";
@@ -33,6 +34,7 @@ export type AppOptions = {
   publicBaseUrl?: string;
   fallbackAssetDir?: string;
   generatedAssetStorageDir?: string;
+  projectStorageDir?: string;
   fetch?: typeof fetch;
 };
 
@@ -60,7 +62,8 @@ export const createApp = async (options: AppOptions = {}) => {
   );
 
   await app.register(cors, {
-    origin: true
+    origin: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "OPTIONS"]
   });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -122,6 +125,9 @@ export const createApp = async (options: AppOptions = {}) => {
   );
   await app.register(async (instance) =>
     registerGeneratedAssetModelRoutes(instance, assetGenerationService)
+  );
+  await app.register(async (instance) =>
+    registerProjectRoutes(instance, options.projectStorageDir ?? config.projectStorageDir)
   );
 
   return app;

@@ -17,6 +17,7 @@ export type ServerConfig = {
   publicBaseUrl: string;
   generatedAssetStorageDir: string;
   fallbackAssetDir: string;
+  projectStorageDir: string;
 };
 
 export const loadEnvFile = (
@@ -62,6 +63,9 @@ export const loadConfig = (env: NodeJS.ProcessEnv = process.env): ServerConfig =
   ),
   fallbackAssetDir: resolve(
     env.FALLBACK_ASSET_DIR ?? "public/assets/fallback"
+  ),
+  projectStorageDir: resolve(
+    env.PROJECT_STORAGE_DIR ?? "storage/projects"
   )
 });
 

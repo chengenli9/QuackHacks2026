@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import { Hexagon, RotateCcw } from 'lucide-react';
 import useStore from '../../store/useStore';
+import { openSavedProjectFromStorage } from '../../lib/projectSession';
 import { exportSceneArtifacts } from '../../lib/sceneExport';
 import styles from './TopBar.module.css';
 
 const MENUS = {
   File: [
     { label: 'New Scene', action: 'resetProject' },
-    { label: 'Open...' },
-    { label: 'Save' },
+    { label: 'Open...', action: 'openProject' },
+    { label: 'Save', action: 'saveProject' },
     '---',
     { label: 'Import .glb', action: 'importGlb' },
     { label: 'Export Scene', action: 'exportScene' },
@@ -70,6 +71,7 @@ export default function TopBar() {
   const [openMenu, setOpenMenu] = useState(null);
   const requestGlbImport = useStore((state) => state.requestGlbImport);
   const resetProject = useStore((state) => state.resetProject);
+  const saveProject = useStore((state) => state.saveProject);
   const addGlbImportWarning = useStore((state) => state.addGlbImportWarning);
 
   const handleMenuAction = async (action) => {
@@ -80,11 +82,17 @@ export default function TopBar() {
       if (action === 'exportScene') {
         await exportSceneArtifacts({ sceneObjects: useStore.getState().sceneObjects });
       }
+      if (action === 'saveProject') {
+        await saveProject();
+      }
+      if (action === 'openProject') {
+        await openSavedProjectFromStorage();
+      }
       if (action === 'resetProject') {
         resetProject();
       }
     } catch (error) {
-      addGlbImportWarning(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
+      addGlbImportWarning(`Project action failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
