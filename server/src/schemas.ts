@@ -169,10 +169,12 @@ export const commandRequestSchema = z.object({
 export const commandResponseSchema = z
   .object({
     operation: sceneOperationSchema.optional(),
+    operations: z.array(sceneOperationSchema).min(1).max(8).optional(),
+    thoughts: z.array(z.string().trim().min(1).max(300)).max(8).optional(),
     message: z.string().trim().min(1).max(1000).optional()
   })
-  .refine((value) => value.operation || value.message, {
-    message: "Command response must include an operation or a message"
+  .refine((value) => value.operation || value.operations?.length || value.message, {
+    message: "Command response must include an operation, operations, or a message"
   });
 
 export const objectCategorySchema = z.enum([

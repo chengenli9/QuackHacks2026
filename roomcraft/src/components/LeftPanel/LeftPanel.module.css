@@ -348,6 +348,20 @@
   font-style: italic;
 }
 
+.messageBubble.thought {
+  border-color: rgba(0, 229, 204, 0.24);
+  color: var(--text-primary);
+}
+
+.messageBubble.tool {
+  border-color: rgba(116, 185, 255, 0.22);
+  color: var(--text-secondary);
+}
+
+.messageBubble.answer {
+  color: var(--text-secondary);
+}
+
 .chatInputRow {
   display: flex;
   gap: var(--space-xs);

@@ -42,6 +42,7 @@ describe("GeminiCommandParser", () => {
 
     expect(requestBody.generationConfig.responseMimeType).toBe("application/json");
     expect(requestBody.generationConfig.responseJsonSchema.properties.operation).toBeDefined();
+    expect(requestBody.generationConfig.responseJsonSchema.properties.operations).toBeDefined();
     expect(requestBody.generationConfig.responseJsonSchema.properties.operation.properties.target).toBeDefined();
     expect(requestBody.generationConfig.responseJsonSchema.properties.operation.properties.changes).toBeDefined();
     expect(
@@ -52,6 +53,7 @@ describe("GeminiCommandParser", () => {
     ).toContain("generate_environment_scene");
     expect(requestBody.contents[0].parts[0].text).toContain("Available tools");
     expect(requestBody.contents[0].parts[0].text).toContain("Reply conversationally");
+    expect(requestBody.contents[0].parts[0].text).toContain("one or more ordered editor tool calls");
     expect(requestBody.contents[0].parts[0].text).toContain("current object transforms");
     expect(response.operation).toEqual({
       action: "update_object_physics",
@@ -93,6 +95,54 @@ describe("GeminiCommandParser", () => {
       })
     ).resolves.toEqual({
       message: "I can help edit objects, physics, materials, backgrounds, and exports."
+    });
+  });
+
+  it("allows Gemini to return multiple ordered tool calls with visible plan lines", async () => {
+    const parser = new GeminiCommandParser({
+      apiKey: "gemini-key",
+      model: "gemini-3.5-flash",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        thoughts: ["Disable gravity first.", "Move the duck after that."],
+                        operations: [
+                          { action: "toggle_gravity", enabled: false },
+                          {
+                            action: "move_object",
+                            target: "duck_01",
+                            position: [1, 2, 3]
+                          }
+                        ]
+                      })
+                    }
+                  ]
+                }
+              }
+            ]
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+    });
+
+    await expect(
+      parser.parse({
+        message: "turn gravity off and move the duck",
+        sceneContext: { objects: [{ id: "duck_01", label: "rubber duck" }] }
+      })
+    ).resolves.toEqual({
+      thoughts: ["Disable gravity first.", "Move the duck after that."],
+      operations: [
+        { action: "toggle_gravity", enabled: false },
+        { action: "move_object", target: "duck_01", position: [1, 2, 3] }
+      ]
     });
   });
 

@@ -15,106 +15,121 @@ type GeminiCommandParserOptions = {
   fetch?: FetchLike;
 };
 
-const sceneOperationJsonSchema = {
+const operationJsonSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
-    operation: {
+    action: {
+      type: "string",
+      enum: [
+        "add_generated_object",
+        "add_local_object",
+        "remove_object",
+        "move_object",
+        "rotate_object",
+        "scale_object",
+        "update_object_physics",
+        "update_object_appearance",
+        "toggle_gravity",
+        "toggle_collisions",
+        "export_scene",
+        "relabel_object",
+        "generate_background_image",
+        "generate_environment_scene"
+      ]
+    },
+    prompt: {
+      type: "string",
+      description: "Prompt for add_generated_object or generate_background_image."
+    },
+    scenePrompt: {
+      type: "string",
+      description: "Prompt for generate_environment_scene Meshy scene GLB generation."
+    },
+    backgroundPrompt: {
+      type: "string",
+      description: "Prompt for generate_environment_scene background image generation."
+    },
+    fallbackAssetKey: {
+      type: "string",
+      enum: ["rubber_ball", "wooden_crate", "glass_vase", "metal_barrel", "duck"]
+    },
+    placement: {
       type: "object",
       additionalProperties: false,
       properties: {
-        action: {
-          type: "string",
-          enum: [
-            "add_generated_object",
-            "add_local_object",
-            "remove_object",
-            "move_object",
-            "rotate_object",
-            "scale_object",
-            "update_object_physics",
-            "update_object_appearance",
-            "toggle_gravity",
-            "toggle_collisions",
-            "export_scene",
-            "relabel_object",
-            "generate_background_image",
-            "generate_environment_scene"
-          ]
-        },
-        prompt: {
-          type: "string",
-          description: "Prompt for add_generated_object or generate_background_image."
-        },
-        scenePrompt: {
-          type: "string",
-          description: "Prompt for generate_environment_scene Meshy scene GLB generation."
-        },
-        backgroundPrompt: {
-          type: "string",
-          description: "Prompt for generate_environment_scene background image generation."
-        },
-        fallbackAssetKey: {
-          type: "string",
-          enum: ["rubber_ball", "wooden_crate", "glass_vase", "metal_barrel", "duck"]
-        },
-        placement: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            mode: { type: "string", enum: ["on_floor", "on_object", "at_position"] },
-            target: { type: "string" },
-            position: {
-              type: "array",
-              items: { type: "number" },
-              minItems: 3,
-              maxItems: 3
-            }
-          },
-          required: ["mode"]
-        },
-        target: {
-          type: "string",
-          description: "Existing scene object ID from sceneContext."
-        },
+        mode: { type: "string", enum: ["on_floor", "on_object", "at_position"] },
+        target: { type: "string" },
         position: {
           type: "array",
           items: { type: "number" },
           minItems: 3,
           maxItems: 3
-        },
-        rotation: {
-          type: "array",
-          items: { type: "number" },
-          minItems: 3,
-          maxItems: 3
-        },
-        scale: {
-          type: "array",
-          items: { type: "number" },
-          minItems: 3,
-          maxItems: 3
-        },
-        changes: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            massKg: { type: "number" },
-            restitution: { type: "number", minimum: 0, maximum: 1 },
-            friction: { type: "number", minimum: 0, maximum: 1 },
-            static: { type: "boolean" },
-            breakable: { type: "boolean" },
-            collider: { type: "string", enum: ["ball", "cuboid", "cylinder", "convex_hull"] },
-            baseColor: { type: "string" },
-            roughness: { type: "number", minimum: 0, maximum: 1 },
-            metalness: { type: "number", minimum: 0, maximum: 1 },
-            textureDescription: { type: "string" }
-          }
-        },
-        enabled: { type: "boolean" },
-        label: { type: "string" }
+        }
       },
-      required: ["action"]
+      required: ["mode"]
+    },
+    target: {
+      type: "string",
+      description: "Existing scene object ID from sceneContext."
+    },
+    position: {
+      type: "array",
+      items: { type: "number" },
+      minItems: 3,
+      maxItems: 3
+    },
+    rotation: {
+      type: "array",
+      items: { type: "number" },
+      minItems: 3,
+      maxItems: 3
+    },
+    scale: {
+      type: "array",
+      items: { type: "number" },
+      minItems: 3,
+      maxItems: 3
+    },
+    changes: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        massKg: { type: "number" },
+        restitution: { type: "number", minimum: 0, maximum: 1 },
+        friction: { type: "number", minimum: 0, maximum: 1 },
+        static: { type: "boolean" },
+        breakable: { type: "boolean" },
+        collider: { type: "string", enum: ["ball", "cuboid", "cylinder", "convex_hull"] },
+        baseColor: { type: "string" },
+        roughness: { type: "number", minimum: 0, maximum: 1 },
+        metalness: { type: "number", minimum: 0, maximum: 1 },
+        textureDescription: { type: "string" }
+      }
+    },
+    enabled: { type: "boolean" },
+    label: { type: "string" }
+  },
+  required: ["action"]
+};
+
+const sceneOperationJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    operation: operationJsonSchema,
+    operations: {
+      type: "array",
+      items: operationJsonSchema,
+      minItems: 1,
+      maxItems: 8,
+      description: "Ordered editor tool calls to run for multi-step user requests."
+    },
+    thoughts: {
+      type: "array",
+      items: { type: "string" },
+      maxItems: 8,
+      description: "Brief user-visible plan/status lines. Do not include hidden reasoning."
     },
     message: {
       type: "string",
@@ -123,6 +138,7 @@ const sceneOperationJsonSchema = {
   },
   anyOf: [
     { required: ["operation"] },
+    { required: ["operations"] },
     { required: ["message"] }
   ]
 };
@@ -157,7 +173,7 @@ export class GeminiCommandParser implements CommandParser {
           parts: [
             {
               text:
-                "You are an agentic 3D scene editor assistant. Reply conversationally when the user is asking a question or discussing options. Choose exactly one editor tool only when the user asks you to change the scene. Available tools: add_generated_object(prompt, placement, fallbackAssetKey?), add_local_object(fallbackAssetKey, placement), remove_object(target), move_object(target, position), rotate_object(target, rotation), scale_object(target, scale), update_object_physics(target, changes), update_object_appearance(target, changes), toggle_gravity(enabled), toggle_collisions(enabled), export_scene(), relabel_object(target, label), generate_background_image(prompt), generate_environment_scene(scenePrompt, backgroundPrompt, placement). Use generate_environment_scene when the user asks for a complete room/world/environment GLB plus matching background. You must include every listed argument required by the chosen tool. Use only object IDs from sceneContext when targeting existing objects. Use current object transforms, dimensions, semantic labels, material metadata, static flags, gravity/collision intent, and relative placement words to choose a target. For add requests, prefer add_generated_object with placement on the mentioned object when possible. For background/sky/horizon/backdrop requests, use generate_background_image. Return only JSON with either operation or message.\n\n" +
+                "You are an agentic 3D scene editor assistant. Reply conversationally when the user is asking a question or discussing options. When the user asks you to change the scene, choose one or more ordered editor tool calls. Available tools: add_generated_object(prompt, placement, fallbackAssetKey?), add_local_object(fallbackAssetKey, placement), remove_object(target), move_object(target, position), rotate_object(target, rotation), scale_object(target, scale), update_object_physics(target, changes), update_object_appearance(target, changes), toggle_gravity(enabled), toggle_collisions(enabled), export_scene(), relabel_object(target, label), generate_background_image(prompt), generate_environment_scene(scenePrompt, backgroundPrompt, placement). Use generate_environment_scene when the user asks for a complete room/world/environment GLB plus matching background. You must include every listed argument required by each chosen tool. Use only object IDs from sceneContext when targeting existing objects. Use current object transforms, dimensions, semantic labels, material metadata, static flags, gravity/collision intent, and relative placement words to choose a target. For add requests, prefer add_generated_object with placement on the mentioned object when possible. For background/sky/horizon/backdrop requests, use generate_background_image. Return only JSON with operation for one tool, operations for multiple tools, message for general answers, and optional thoughts containing brief user-visible plan/status lines without hidden reasoning.\n\n" +
                 JSON.stringify(request)
             }
           ]
@@ -171,28 +187,43 @@ export class GeminiCommandParser implements CommandParser {
 }
 
 function normalizeCommandResponse(response: CommandResponse): CommandResponse {
+  if (response.operations?.length) {
+    return {
+      ...response,
+      operations: response.operations.map((operation) =>
+        normalizeAppearanceOperation(operation)
+      )
+    };
+  }
+
   if (!response.operation) return response;
-
-  if (response.operation.action !== "update_object_appearance") {
-    return response;
-  }
-
-  const baseColor = response.operation.changes.baseColor;
-  if (!baseColor || /^#[0-9a-fA-F]{6}$/.test(baseColor)) {
-    return response;
-  }
-
-  const color = cssColorToHex(baseColor);
-  if (!color) return response;
 
   return {
     ...response,
-    operation: {
-      ...response.operation,
-      changes: {
-        ...response.operation.changes,
-        baseColor: color
-      }
+    operation: normalizeAppearanceOperation(response.operation)
+  };
+}
+
+function normalizeAppearanceOperation(
+  operation: NonNullable<CommandResponse["operation"]>
+): NonNullable<CommandResponse["operation"]> {
+  if (operation.action !== "update_object_appearance") {
+    return operation;
+  }
+
+  const baseColor = operation.changes.baseColor;
+  if (!baseColor || /^#[0-9a-fA-F]{6}$/.test(baseColor)) {
+    return operation;
+  }
+
+  const color = cssColorToHex(baseColor);
+  if (!color) return operation;
+
+  return {
+    ...operation,
+    changes: {
+      ...operation.changes,
+      baseColor: color
     }
   };
 }

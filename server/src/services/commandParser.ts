@@ -25,6 +25,7 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
   const request = commandRequestSchema.parse(input);
   const message = request.message.trim();
   const normalized = normalize(message);
+  const selectedObjectId = request.sceneContext.selectedObjectId;
 
   if (normalized.includes("collision")) {
     return validateOperation({
@@ -54,12 +55,22 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
     return validateOperation({ action: "export_scene" });
   }
 
-  const transform = parseTransformCommand(message, normalized, request.sceneContext.objects);
+  const transform = parseTransformCommand(
+    message,
+    normalized,
+    request.sceneContext.objects,
+    selectedObjectId
+  );
   if (transform) {
     return transform;
   }
 
-  const relabel = parseRelabelCommand(message, normalized, request.sceneContext.objects);
+  const relabel = parseRelabelCommand(
+    message,
+    normalized,
+    request.sceneContext.objects,
+    selectedObjectId
+  );
   if (relabel) {
     return relabel;
   }
@@ -69,17 +80,27 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
     return generated;
   }
 
-  const appearance = parseAppearanceCommand(message, normalized, request.sceneContext.objects);
+  const appearance = parseAppearanceCommand(
+    message,
+    normalized,
+    request.sceneContext.objects,
+    selectedObjectId
+  );
   if (appearance) {
     return appearance;
   }
 
-  const physics = parsePhysicsCommand(message, normalized, request.sceneContext.objects);
+  const physics = parsePhysicsCommand(
+    message,
+    normalized,
+    request.sceneContext.objects,
+    selectedObjectId
+  );
   if (physics) {
     return physics;
   }
 
-  const remove = parseRemoveCommand(normalized, request.sceneContext.objects);
+  const remove = parseRemoveCommand(normalized, request.sceneContext.objects, selectedObjectId);
   if (remove) {
     return remove;
   }
@@ -91,9 +112,48 @@ export const parseSceneCommand = (input: CommandRequest): SceneOperation => {
   );
 };
 
+export const parseSceneOperations = (input: CommandRequest): SceneOperation[] => {
+  const request = commandRequestSchema.parse(input);
+  const segments = splitCommandSegments(request.message);
+
+  if (segments.length > 1) {
+    return segments.map((segment) =>
+      parseSceneCommand({
+        ...request,
+        message: segment
+      })
+    );
+  }
+
+  try {
+    return [parseSceneCommand(request)];
+  } catch (error) {
+    if (!(error instanceof HttpError && error.code === "UnsupportedCommand")) {
+      throw error;
+    }
+  }
+  throw new HttpError(
+    422,
+    "UnsupportedCommand",
+    "Could not convert chat message into supported scene operations"
+  );
+};
+
 export const buildCommandResponse = async (input: CommandRequest) => {
   try {
-    return commandResponseSchema.parse({ operation: parseSceneCommand(input) });
+    const operations = parseSceneOperations(input);
+    const thoughts = operations.map((operation, index) =>
+      `${index + 1}. ${visibleStepForOperation(operation)}`
+    );
+
+    return commandResponseSchema.parse({
+      ...(operations.length === 1 ? { operation: operations[0] } : { operations }),
+      thoughts,
+      message:
+        operations.length === 1
+          ? visibleStepForOperation(operations[0])
+          : `I will run ${operations.length} editor tools in order.`
+    });
   } catch (error) {
     if (error instanceof HttpError && error.code === "UnsupportedCommand") {
       return commandResponseSchema.parse({
@@ -207,7 +267,8 @@ const parseGeneratedAssetCommand = (
 const parseTransformCommand = (
   message: string,
   normalized: string,
-  objects: SceneObject[]
+  objects: SceneObject[],
+  selectedObjectId?: string
 ): SceneOperation | undefined => {
   const action = normalized.includes("move")
     ? "move_object"
@@ -218,7 +279,7 @@ const parseTransformCommand = (
         : undefined;
 
   if (!action) return undefined;
-  const target = findMentionedObject(normalized, objects);
+  const target = findMentionedObject(normalized, objects, selectedObjectId);
   if (!target) return undefined;
   const vector = parseVector3(message);
   if (!vector) return undefined;
@@ -235,10 +296,11 @@ const parseTransformCommand = (
 const parseRelabelCommand = (
   message: string,
   normalized: string,
-  objects: SceneObject[]
+  objects: SceneObject[],
+  selectedObjectId?: string
 ): SceneOperation | undefined => {
   if (!/\b(rename|relabel|call)\b/.test(normalized)) return undefined;
-  const target = findMentionedObject(normalized, objects);
+  const target = findMentionedObject(normalized, objects, selectedObjectId);
   if (!target) return undefined;
 
   const labelMatch = message.match(/\b(?:to|as)\s+(.+)$/i);
@@ -255,13 +317,14 @@ const parseRelabelCommand = (
 const parseAppearanceCommand = (
   message: string,
   normalized: string,
-  objects: SceneObject[]
+  objects: SceneObject[],
+  selectedObjectId?: string
 ): SceneOperation | undefined => {
   if (!/\b(make|set|turn|change|color|paint)\b/.test(normalized)) {
     return undefined;
   }
 
-  const target = findMentionedObject(normalized, objects);
+  const target = findMentionedObject(normalized, objects, selectedObjectId);
   if (!target) return undefined;
 
   const changes: Record<string, string | number> = {};
@@ -299,13 +362,14 @@ const parseAppearanceCommand = (
 const parsePhysicsCommand = (
   message: string,
   normalized: string,
-  objects: SceneObject[]
+  objects: SceneObject[],
+  selectedObjectId?: string
 ): SceneOperation | undefined => {
   if (!/\b(make|set|turn)\b/.test(normalized)) {
     return undefined;
   }
 
-  const target = findMentionedObject(normalized, objects);
+  const target = findMentionedObject(normalized, objects, selectedObjectId);
 
   if (!target) {
     return undefined;
@@ -392,13 +456,14 @@ const parsePhysicsCommand = (
 
 const parseRemoveCommand = (
   normalized: string,
-  objects: SceneObject[]
+  objects: SceneObject[],
+  selectedObjectId?: string
 ): SceneOperation | undefined => {
   if (!/\b(delete|remove)\b/.test(normalized)) {
     return undefined;
   }
 
-  const target = findMentionedObject(normalized, objects);
+  const target = findMentionedObject(normalized, objects, selectedObjectId);
 
   if (!target) {
     return undefined;
@@ -482,9 +547,15 @@ const fallbackKeyFor = (prompt: string): FallbackAssetKey | undefined => {
 
 const findMentionedObject = (
   normalizedMessage: string,
-  objects: SceneObject[]
-): SceneObject | undefined =>
-  objects.find((object) => {
+  objects: SceneObject[],
+  selectedObjectId?: string
+): SceneObject | undefined => {
+  if (selectedObjectId && /\b(it|this|that|selected|selection|object)\b/.test(normalizedMessage)) {
+    const selected = objects.find((object) => object.id === selectedObjectId);
+    if (selected) return selected;
+  }
+
+  return objects.find((object) => {
     const label = normalize(object.label);
     const id = normalize(object.id).replaceAll("_", " ");
     return (
@@ -496,6 +567,7 @@ const findMentionedObject = (
         .some((token) => normalizedMessage.includes(token))
     );
   });
+};
 
 const findObjectByPhrase = (
   normalizedPhrase: string,
@@ -514,6 +586,45 @@ const findObjectByPhrase = (
 
 const validateOperation = (operation: unknown): SceneOperation =>
   sceneOperationSchema.parse(operation);
+
+const splitCommandSegments = (message: string): string[] =>
+  message
+    .split(/(?:\s*;\s*|\s+(?:and\s+then|then)\s+|\s+and\s+(?=(?:turn|toggle|move|rotate|scale|rename|relabel|call|make|set|delete|remove|add|create|generate|export|download|save)\b))/i)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+function visibleStepForOperation(operation: SceneOperation): string {
+  switch (operation.action) {
+    case "add_generated_object":
+      return `Create "${operation.prompt}" and place it in the scene.`;
+    case "add_local_object":
+      return `Insert the local ${operation.fallbackAssetKey.replaceAll("_", " ")} asset.`;
+    case "remove_object":
+      return `Remove ${operation.target}.`;
+    case "move_object":
+      return `Move ${operation.target} to ${operation.position.join(", ")}.`;
+    case "rotate_object":
+      return `Rotate ${operation.target} to ${operation.rotation.join(", ")}.`;
+    case "scale_object":
+      return `Scale ${operation.target} to ${operation.scale.join(", ")}.`;
+    case "update_object_physics":
+      return `Update physics on ${operation.target}.`;
+    case "update_object_appearance":
+      return `Update appearance on ${operation.target}.`;
+    case "toggle_gravity":
+      return operation.enabled ? "Turn gravity on." : "Turn gravity off.";
+    case "toggle_collisions":
+      return operation.enabled ? "Turn collisions on." : "Turn collisions off.";
+    case "export_scene":
+      return "Export the scene and physics metadata.";
+    case "relabel_object":
+      return `Rename ${operation.target} to "${operation.label}".`;
+    case "generate_background_image":
+      return `Generate a background image for "${operation.prompt}".`;
+    case "generate_environment_scene":
+      return `Generate an environment scene and matching background.`;
+  }
+}
 
 const numericProperty = (value: string, name: string): number | undefined => {
   const normalized = value.toLowerCase().replace(/[^\w\s.=]/g, " ").replace(/\s+/g, " ").trim();

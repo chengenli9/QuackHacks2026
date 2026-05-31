@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { FallbackCommandParser } from "../src/services/fallbackCommandParser.js";
-import { buildCommandResponse, parseSceneCommand } from "../src/services/commandParser.js";
+import {
+  buildCommandResponse,
+  parseSceneCommand,
+  parseSceneOperations
+} from "../src/services/commandParser.js";
 
 const sceneContext = {
   objects: [
@@ -64,6 +68,46 @@ describe("extended local command parser", () => {
         sceneContext
       })
     ).toEqual({ action: "relabel_object", target: "duck_01", label: "bath toy" });
+  });
+
+  it("parses multi-tool prompts into ordered operations", async () => {
+    const command = {
+      message: "turn gravity off and move the duck to 1 2 3",
+      sceneContext: {
+        ...sceneContext,
+        selectedObjectId: "duck_01"
+      }
+    };
+
+    expect(parseSceneOperations(command)).toEqual([
+      { action: "toggle_gravity", enabled: false },
+      { action: "move_object", target: "duck_01", position: [1, 2, 3] }
+    ]);
+
+    await expect(buildCommandResponse(command)).resolves.toEqual({
+      operations: [
+        { action: "toggle_gravity", enabled: false },
+        { action: "move_object", target: "duck_01", position: [1, 2, 3] }
+      ],
+      thoughts: ["1. Turn gravity off.", "2. Move duck_01 to 1, 2, 3."],
+      message: "I will run 2 editor tools in order."
+    });
+  });
+
+  it("uses the selected object for this/it follow-up editing commands", () => {
+    expect(
+      parseSceneCommand({
+        message: "make it bouncier",
+        sceneContext: {
+          ...sceneContext,
+          selectedObjectId: "duck_01"
+        }
+      })
+    ).toEqual({
+      action: "update_object_physics",
+      target: "duck_01",
+      changes: { restitution: 0.85 }
+    });
   });
 
   it("parses collision and material editing commands", () => {

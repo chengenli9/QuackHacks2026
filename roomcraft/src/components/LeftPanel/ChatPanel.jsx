@@ -9,6 +9,11 @@ import {
   requestGeneratedAssetStatus,
   requestSceneCommand,
 } from '../../lib/apiClient';
+import {
+  operationsFromCommandResponse,
+  toolCallLabel,
+  visibleThoughtsFromCommandResponse,
+} from '../../lib/agentCommandResponse';
 import { fallbackPromptForAssetKey } from '../../lib/fallbackAssets';
 import { loadGlbIntoScene } from '../../lib/glbImport';
 import { createProjectAssetSource } from '../../lib/projectPersistence';
@@ -74,12 +79,30 @@ export default function ChatPanel() {
         gravityEnabled: state.gravityEnabled,
         collisionsEnabled: state.collisionsEnabled,
       });
-      if (response.operation) {
-        await handleOperation(response.operation, response.message);
+      const operations = operationsFromCommandResponse(response);
+      const thoughts = visibleThoughtsFromCommandResponse(response);
+      if (operations.length > 0) {
+        updateLastMessage({
+          id: nextMessageId(),
+          sender: 'ai',
+          kind: 'thought',
+          text: response.message ?? `I will run ${operations.length} editor tool${operations.length === 1 ? '' : 's'}.`,
+        });
+        const visibleThoughts = operations.length > 1 ? thoughts : [];
+        for (const thought of visibleThoughts) {
+          addChatMessage({
+            id: nextMessageId(),
+            sender: 'ai',
+            kind: 'thought',
+            text: `Thought: ${thought}`,
+          });
+        }
+        await handleOperations(operations);
       } else {
         updateLastMessage({
           id: nextMessageId(),
           sender: 'ai',
+          kind: 'answer',
           text: response.message ?? 'I can help edit the scene when you ask for a specific change.',
         });
       }
@@ -87,10 +110,24 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'answer',
         text: `I could not apply that command: ${errorMessage(error)}`,
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleOperations = async (operations) => {
+    for (const operation of operations) {
+      addChatMessage({
+        id: nextMessageId(),
+        sender: 'ai',
+        kind: 'tool',
+        text: `Tool: ${toolCallLabel(operation)}...`,
+        typing: true,
+      });
+      await handleOperation(operation);
     }
   };
 
@@ -124,6 +161,7 @@ export default function ChatPanel() {
     updateLastMessage({
       id: nextMessageId(),
       sender: 'ai',
+      kind: 'tool',
       text: assistantMessage ?? labelForAppliedOperation(operation),
     });
   };
@@ -143,6 +181,7 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'tool',
         text: assistantMessage ?? `Started Meshy generation for "${operation.prompt}".`,
       });
 
@@ -159,6 +198,7 @@ export default function ChatPanel() {
         addChatMessage({
           id: nextMessageId(),
           sender: 'ai',
+          kind: 'answer',
           text: operation.fallbackAssetKey
             ? 'Generation did not finish. Use the fallback asset button in Import when you want the deterministic local asset.'
             : 'Generation did not finish and no fallback asset is available for this prompt.',
@@ -211,6 +251,7 @@ export default function ChatPanel() {
       addChatMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'answer',
         text: `Added "${asset.sourcePrompt}" to the scene.`,
       });
     } catch (error) {
@@ -225,6 +266,7 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'answer',
         text: operation.fallbackAssetKey
           ? `Generation failed: ${errorMessage(error)}. A fallback asset is available in Import.`
           : `Generation failed: ${errorMessage(error)}.`,
@@ -291,6 +333,7 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'tool',
         text: `Added "${asset.sourcePrompt}" to the scene.`,
       });
     } catch (error) {
@@ -306,6 +349,7 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'answer',
         text: `Fallback import failed: ${errorMessage(error)}.`,
       });
     }
@@ -317,19 +361,21 @@ export default function ChatPanel() {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'tool',
         text: 'Exported scene.glb and scene.physics.json.',
       });
     } catch (error) {
       updateLastMessage({
         id: nextMessageId(),
         sender: 'ai',
+        kind: 'answer',
         text: `Export failed: ${errorMessage(error)}.`,
       });
     }
   };
 
   const writeAssistantStatus = (text, { append = false } = {}) => {
-    const message = { id: nextMessageId(), sender: 'ai', text };
+    const message = { id: nextMessageId(), sender: 'ai', kind: 'tool', text };
     if (append) {
       addChatMessage(message);
     } else {
@@ -356,6 +402,7 @@ export default function ChatPanel() {
     updateLastMessage({
       id: nextMessageId(),
       sender: 'ai',
+      kind: 'tool',
       text: assistantMessage ?? `Generating environment scene "${operation.scenePrompt}".`,
     });
 
@@ -366,6 +413,7 @@ export default function ChatPanel() {
     addChatMessage({
       id: nextMessageId(),
       sender: 'ai',
+      kind: 'tool',
       text: backgroundReady
         ? 'Starting Meshy environment GLB generation.'
         : 'Continuing with Meshy environment GLB generation without a new background.',
@@ -385,7 +433,7 @@ export default function ChatPanel() {
         {chatMessages.map((msg) => (
           <div
             key={msg.id}
-            className={`${styles.messageBubble} ${styles[msg.sender]} ${msg.typing ? styles.typing : ''}`}
+            className={`${styles.messageBubble} ${styles[msg.sender]} ${msg.kind ? styles[msg.kind] : ''} ${msg.typing ? styles.typing : ''}`}
           >
             {msg.sender === 'ai' && !msg.typing && (
               <span style={{ color: 'var(--accent)', fontWeight: 700, marginRight: 4 }}>AI:</span>
