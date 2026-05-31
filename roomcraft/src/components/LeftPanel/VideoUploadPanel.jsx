@@ -56,7 +56,7 @@ export default function VideoUploadPanel() {
     vlmEstimateStatus,
     setGlbImportStatus,
     setVlmEstimateStatus,
-    setImportedScene,
+    addImportedScene,
     mergeSceneObjectEstimate,
     addGlbImportWarning,
     clearImportedScene,
@@ -74,14 +74,14 @@ export default function VideoUploadPanel() {
     const loader = new GLTFLoader();
     const url = URL.createObjectURL(file);
 
-    clearImportedScene();
     setGlbImportStatus('loading');
     setVlmEstimateStatus('idle');
 
     try {
       const gltf = await loader.loadAsync(url);
-      const registry = createSceneObjectRegistry(gltf.scene, { sourceFileName: file.name });
-      setImportedScene({ fileName: file.name, objects: registry.objects, warnings: registry.warnings });
+      const existingIds = sceneObjects.map((object) => object.id);
+      const registry = createSceneObjectRegistry(gltf.scene, { sourceFileName: file.name, existingIds });
+      addImportedScene({ fileName: file.name, objects: registry.objects, warnings: registry.warnings });
 
       const targets = registry.objects.filter((object) => object.physics.needsVisualEstimate);
       if (!ESTIMATOR_API_BASE_URL || targets.length === 0) {
@@ -114,10 +114,10 @@ export default function VideoUploadPanel() {
     }
   }, [
     addGlbImportWarning,
-    clearImportedScene,
+    addImportedScene,
     mergeSceneObjectEstimate,
+    sceneObjects,
     setGlbImportStatus,
-    setImportedScene,
     setVlmEstimateStatus,
   ]);
 

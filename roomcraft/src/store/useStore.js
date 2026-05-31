@@ -56,6 +56,16 @@ const useStore = create((set) => ({
       selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
       expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
     })),
+  addImportedScene: ({ fileName, objects, warnings = [] }) =>
+    set((state) => ({
+      importedGlbFileName: fileName,
+      sceneObjects: [...state.sceneObjects, ...objects],
+      glbImportStatus: 'ready',
+      glbImportError: null,
+      glbImportWarnings: [...state.glbImportWarnings, ...warnings],
+      selectedObjectId: objects[0]?.id ?? state.selectedObjectId,
+      expandedNodes: Array.from(new Set([...state.expandedNodes, 'Scene', 'Imported_GLB'])),
+    })),
   mergeSceneObjectEstimate: (objectId, estimate) =>
     set((state) => ({
       sceneObjects: state.sceneObjects.map((object) =>

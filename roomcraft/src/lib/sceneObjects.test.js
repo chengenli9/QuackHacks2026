@@ -45,6 +45,17 @@ test('creates stable unique ids when GLB nodes reuse the same label', () => {
   assert.deepEqual(registry.objects.map((object) => object.id), ['chair', 'chair_2', 'chair_3']);
 });
 
+test('avoids ids already present in the scene when adding another GLB', () => {
+  const root = new Object3D();
+  root.add(mesh('geometry_0'), mesh('geometry_1'));
+
+  const registry = createSceneObjectRegistry(root, {
+    existingIds: ['geometry_0', 'geometry_0_2', 'geometry_1'],
+  });
+
+  assert.deepEqual(registry.objects.map((object) => object.id), ['geometry_0_3', 'geometry_1_2']);
+});
+
 test('warns when a GLB only exposes one merged renderable object', () => {
   const root = new Object3D();
   root.add(mesh('merged_room'));

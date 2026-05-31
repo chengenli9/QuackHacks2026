@@ -1,9 +1,10 @@
 import { Box3, Vector3 } from 'three';
 import { inferPhysicsProfile, isGenericSceneNodeLabel } from './physicsProfiles.js';
+import { prepareImportedObjectVisuals } from './importedVisuals.js';
 
 const GENERIC_CONTAINER_NAMES = new Set(['', 'scene', 'root', 'gltfscene', 'gltf_scene']);
 
-export function createSceneObjectRegistry(root, { sourceFileName = null } = {}) {
+export function createSceneObjectRegistry(root, { sourceFileName = null, existingIds = [] } = {}) {
   if (!root) {
     return {
       sourceFileName,
@@ -15,7 +16,7 @@ export function createSceneObjectRegistry(root, { sourceFileName = null } = {}) 
   root.updateWorldMatrix?.(true, true);
 
   const nodes = findRenderableObjectRoots(root);
-  const usedIds = new Map();
+  const usedIds = new Set(existingIds);
   const objects = nodes.map((node, index) => {
     const label = cleanLabel(node.name) || `geometry_${index}`;
     const id = uniqueId(slugify(label) || `geometry_${index}`, usedIds);
@@ -23,6 +24,7 @@ export function createSceneObjectRegistry(root, { sourceFileName = null } = {}) 
     const meshStats = meshStatsFor(node);
 
     node.userData.roomcraftObjectId = id;
+    prepareImportedObjectVisuals(node);
     node.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
@@ -123,9 +125,20 @@ function slugify(label) {
 }
 
 function uniqueId(baseId, usedIds) {
-  const count = usedIds.get(baseId) ?? 0;
-  usedIds.set(baseId, count + 1);
-  return count === 0 ? baseId : `${baseId}_${count + 1}`;
+  if (!usedIds.has(baseId)) {
+    usedIds.add(baseId);
+    return baseId;
+  }
+
+  let suffix = 2;
+  let candidate = `${baseId}_${suffix}`;
+  while (usedIds.has(candidate)) {
+    suffix += 1;
+    candidate = `${baseId}_${suffix}`;
+  }
+
+  usedIds.add(candidate);
+  return candidate;
 }
 
 function boundsFor(node) {

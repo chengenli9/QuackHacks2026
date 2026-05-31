@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   GizmoHelper,
   GizmoViewport,
+  Environment,
   Grid,
   OrbitControls,
   TransformControls,
@@ -109,11 +110,13 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
       gl={{ antialias: true }}
       style={{ background: '#444444' }}
     >
-      <ambientLight intensity={0.3} />
+      <ambientLight intensity={0.55} />
+      <hemisphereLight intensity={0.85} color="#ffffff" groundColor="#4b5563" />
+      <Environment preset="studio" />
       <directionalLight
         castShadow
         position={[5, 8, 4]}
-        intensity={1.2}
+        intensity={1.5}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-far={50}
         shadow-camera-left={-10}
@@ -137,11 +140,8 @@ export default function ThreeScene({ onCameraUpdate, cameraTarget }) {
         infiniteGrid
       />
 
-      {sceneObjects.length ? (
-        <ImportedPhysicsScene sceneObjects={sceneObjects} />
-      ) : (
-        <DefaultInteractiveScene />
-      )}
+      <DefaultInteractiveScene />
+      {sceneObjects.length > 0 && <ImportedPhysicsScene sceneObjects={sceneObjects} />}
 
       <OrbitControls
         makeDefault
