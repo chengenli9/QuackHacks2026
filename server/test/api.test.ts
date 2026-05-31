@@ -90,7 +90,7 @@ describe("backend API", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({
+    expect(response.json()).toMatchObject({
       operation: {
         action: "add_generated_object",
         prompt: "rubber duck",
@@ -98,6 +98,9 @@ describe("backend API", () => {
         fallbackAssetKey: "duck"
       }
     });
+    expect(response.json().thoughts).toEqual([
+      "1. Create \"rubber duck\" and place it in the scene."
+    ]);
   });
 
   it("parses common non-generation chat commands", async () => {
@@ -109,9 +112,10 @@ describe("backend API", () => {
       payload: { message: "turn gravity on", sceneContext: { objects: [] } }
     });
     expect(gravity.statusCode).toBe(200);
-    expect(gravity.json()).toEqual({
+    expect(gravity.json()).toMatchObject({
       operation: { action: "toggle_gravity", enabled: true }
     });
+    expect(gravity.json().thoughts).toEqual(["1. Turn gravity on."]);
 
     const bouncy = await app.inject({
       method: "POST",
@@ -122,13 +126,14 @@ describe("backend API", () => {
       }
     });
     expect(bouncy.statusCode).toBe(200);
-    expect(bouncy.json()).toEqual({
+    expect(bouncy.json()).toMatchObject({
       operation: {
         action: "update_object_physics",
         target: "duck_01",
         changes: { restitution: 0.85 }
       }
     });
+    expect(bouncy.json().thoughts).toEqual(["1. Update physics on duck_01."]);
   });
 
   it("routes chat commands through the configured command parser provider", async () => {
